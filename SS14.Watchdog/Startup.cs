@@ -53,8 +53,16 @@ namespace SS14.Watchdog
             var serverManager = app.ApplicationServices.GetRequiredService<IServerManager>();
             foreach (var instance in serverManager.Instances)
             {
-                var provider = new PhysicalFileProvider(Path.Combine(instance.InstanceDir, "binaries"));
+                var dirPath = Path.Combine(instance.InstanceDir, "binaries");
+
+                if (!Directory.Exists(dirPath))
+                {
+                    Directory.CreateDirectory(dirPath);
+                }
+
+                var provider = new PhysicalFileProvider(dirPath);
                 var path = $"/instances/{instance.Key}/binaries";
+
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     RequestPath = path,
