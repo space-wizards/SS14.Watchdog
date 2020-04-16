@@ -8,17 +8,18 @@ Logging:
 BaseUrl: "http://localhost:5000/"
 
 Servers:
+  InstanceRoot: "bin/instances"
   Instances:
     syndicate_mothership:
       Name: "Syndicate Mothership"
       ApiToken: "Honk"
       ApiPort: 1212
-      RunCommand: "/ssdhome/pj/Projects/space-station-14-content/bin/Content.Server/Content.Server"
-      UpdateType: "Local"
-      Updates:
-        CurrentVersion: "honk2"
-      
-      #UpdateType: "Jenkins"
+      #RunCommand: "/ssdhome/pj/Projects/space-station-14-content/bin/Content.Server/Content.Server"
+      #UpdateType: "Local"
       #Updates:
-      #  BaseUrl: "https://builds.spacestation14.io/jenkins"
-      #  JobName: "SS14 Content"
+      #  CurrentVersion: "honk2"
+      
+      UpdateType: "Jenkins"
+      Updates:
+        BaseUrl: "https://builds.spacestation14.io/jenkins"
+        JobName: "SS14 Content"
