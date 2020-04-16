@@ -1,0 +1,24 @@
+Logging:
+  LogLevel:
+    Default: "Information"
+    Microsoft: "Warning"
+    Microsoft.Hosting.Lifetime: "Information"
+    SS14: "Trace"
+
+BaseUrl: "http://localhost:5000/"
+
+Servers:
+  Instances:
+    syndicate_mothership:
+      Name: "Syndicate Mothership"
+      ApiToken: "Honk"
+      ApiPort: 1212
+      RunCommand: "/ssdhome/pj/Projects/space-station-14-content/bin/Content.Server/Content.Server"
+      UpdateType: "Local"
+      Updates:
+        CurrentVersion: "honk2"
+      
+      #UpdateType: "Jenkins"
+      #Updates:
+      #  BaseUrl: "https://builds.spacestation14.io/jenkins"
+      #  JobName: "SS14 Content"
