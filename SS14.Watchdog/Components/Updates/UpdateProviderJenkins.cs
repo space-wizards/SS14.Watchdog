@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -78,7 +79,8 @@ namespace SS14.Watchdog.Components.Updates
                     return null;
                 }
 
-                _logger.LogTrace("New version is {newVersion} from {oldVersion}", buildRef.Number, currentVersion ?? "<none>");
+                _logger.LogTrace("New version is {newVersion} from {oldVersion}", buildRef.Number,
+                    currentVersion ?? "<none>");
 
 
                 var downloadRootUri = new Uri($"{_baseUrl}/job/{_jobName}/{buildRef.Number}/artifact/release/");
@@ -117,7 +119,8 @@ namespace SS14.Watchdog.Components.Updates
                 // Download URI for server binary.
                 var serverDownload = new Uri(downloadRootUri, $"SS14.Server_{GetHostPlatformName()}_x64.zip");
 
-                _logger.LogTrace("Downloading server binary from {download} to {tempFile}", serverDownload, tempFile.Name);
+                _logger.LogTrace("Downloading server binary from {download} to {tempFile}", serverDownload,
+                    tempFile.Name);
 
                 // Download to file...
                 var resp = await _httpClient.GetAsync(serverDownload, cancel);
@@ -138,6 +141,21 @@ namespace SS14.Watchdog.Components.Updates
                 // Actually extract.
                 using var archive = new ZipArchive(tempFile, ZipArchiveMode.Read);
                 archive.ExtractToDirectory(binPath);
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
+                    RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                {
+                    // chmod +x Robust.Server
+
+                    var rsPath = Path.Combine(binPath, "Robust.Server");
+                    if (File.Exists(rsPath))
+                    {
+                        Process.Start(new ProcessStartInfo("chmod")
+                        {
+                            ArgumentList = {"+x", rsPath}
+                        });
+                    }
+                }
 
                 return revision;
             }
