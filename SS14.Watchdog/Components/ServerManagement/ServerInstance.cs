@@ -417,6 +417,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             _taskQueue.QueueTask(async cancel =>
             {
                 var updateAvailable = await _updateProvider.CheckForUpdateAsync(_currentRevision?.Version, cancel);
+                _logger.LogTrace("Update is indeed available.");
                 if (updateAvailable == _updateOnRestart)
                 {
                     return;
@@ -430,6 +431,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                     {
                         if (IsRunning)
                         {
+                            _logger.LogTrace("Server is running, sending update notification.");
                             await SendUpdateNotificationAsync(cancel);
                         }
                         else if (_startupFailUpdateWait)
@@ -448,7 +450,12 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         private async Task SendUpdateNotificationAsync(CancellationToken cancel = default)
         {
-            await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null, cancel);
+            var resp = await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null, cancel);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Bad HTTP status code on update notification: {status}", resp.StatusCode);
+            }
         }
 
         public async Task SendShutdownNotificationAsync(CancellationToken cancel = default)
