@@ -197,6 +197,8 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             _lastPing = null;
 
+            _logger.LogTrace("Getting launch info...");
+
             var startInfo = new ProcessStartInfo
             {
                 WorkingDirectory = InstanceDir,
@@ -254,13 +256,18 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             // startInfo.ArgumentList.Add();
 
+            _logger.LogTrace("Launching...");
             _runningServerProcess = Process.Start(startInfo);
+
+            _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess.Id);
 
             _monitorTask = MonitorServerAsync();
         }
 
         private async Task MonitorServerAsync()
         {
+            _logger.LogDebug("Starting to monitor server");
+
             var exitTask = _runningServerProcess!.WaitForExitAsync();
 
             StartTimeoutTimer();
@@ -385,6 +392,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             try
             {
+                _logger.LogDebug("Timeout timer started");
                 await Task.Delay(PingTimeoutDelay, token);
 
                 await _stateLock.WaitAsync(token);
@@ -392,6 +400,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             catch (TaskCanceledException)
             {
                 // It still lives.
+                _logger.LogDebug("Timeout broken, it lives.");
                 return;
             }
 
