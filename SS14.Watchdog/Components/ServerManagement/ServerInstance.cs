@@ -203,6 +203,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             {
                 WorkingDirectory = InstanceDir,
                 FileName = Path.Combine(InstanceDir, _instanceConfig.RunCommand),
+                UseShellExecute = false,
                 ArgumentList =
                 {
                     // Watchdog comms config.
