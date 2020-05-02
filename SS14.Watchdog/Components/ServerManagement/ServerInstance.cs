@@ -428,10 +428,6 @@ namespace SS14.Watchdog.Components.ServerManagement
             {
                 var updateAvailable = await _updateProvider.CheckForUpdateAsync(_currentRevision?.Version, cancel);
                 _logger.LogTrace("Update is indeed available.");
-                if (updateAvailable == _updateOnRestart)
-                {
-                    return;
-                }
 
                 await _stateLock.WaitAsync(cancel);
                 try
