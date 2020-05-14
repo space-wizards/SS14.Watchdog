@@ -337,6 +337,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                 _logger.LogTrace("Authorization: Basic {0}", combined);
             }
 
+            _serverHttpClient.DefaultRequestHeaders.Remove("WatchdogToken");
             _serverHttpClient.DefaultRequestHeaders.Add("WatchdogToken", token);
         }
 
@@ -393,7 +394,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             try
             {
-                _logger.LogDebug("Timeout timer started");
+                _logger.LogTrace("Timeout timer started");
                 await Task.Delay(PingTimeoutDelay, token);
 
                 await _stateLock.WaitAsync(token);
@@ -401,7 +402,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             catch (TaskCanceledException)
             {
                 // It still lives.
-                _logger.LogDebug("Timeout broken, it lives.");
+                _logger.LogTrace("Timeout broken, it lives.");
                 return;
             }
 
