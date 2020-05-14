@@ -4,6 +4,11 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SS14.Watchdog", "SS14.Watch
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SS14.Watchdog.Tests", "SS14.Watchdog.Tests\SS14.Watchdog.Tests.csproj", "{54804661-4A4D-4644-9F54-652C64557F8F}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{CFC0C37D-43CA-43FF-BEE6-204A376B8431}"
+ProjectSection(SolutionItems) = preProject
+	SS14.Watchdog\publish.sh = SS14.Watchdog\publish.sh
+EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
