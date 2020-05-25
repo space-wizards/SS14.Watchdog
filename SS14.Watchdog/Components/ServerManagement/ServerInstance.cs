@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -148,6 +149,10 @@ namespace SS14.Watchdog.Components.ServerManagement
             {
                 await StartLockedAsync();
             }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Exception while starting server.");
+            }
             finally
             {
                 _stateLock.Release();
@@ -258,7 +263,16 @@ namespace SS14.Watchdog.Components.ServerManagement
             // startInfo.ArgumentList.Add();
 
             _logger.LogTrace("Launching...");
-            _runningServerProcess = Process.Start(startInfo);
+            try
+            {
+                _runningServerProcess = Process.Start(startInfo);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, "Exception while launching!");
+                ExceptionDispatchInfo.Capture(e).Throw();
+                throw; // So the compiler doesn't complain about methods which don't either return or throw.
+            }
 
             _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess.Id);
 
