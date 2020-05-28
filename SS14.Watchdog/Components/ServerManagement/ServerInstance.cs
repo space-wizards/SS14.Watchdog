@@ -259,37 +259,36 @@ namespace SS14.Watchdog.Components.ServerManagement
                 }
             }
 
-
-            // startInfo.ArgumentList.Add();
-
             _logger.LogTrace("Launching...");
             try
             {
                 _runningServerProcess = Process.Start(startInfo);
+                _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess.Id);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "Exception while launching!");
-                ExceptionDispatchInfo.Capture(e).Throw();
-                throw; // So the compiler doesn't complain about methods which don't either return or throw.
             }
 
-            _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess.Id);
-
+            // MonitorServerAsync will catch start exception and restart if necessary.
             _monitorTask = MonitorServerAsync();
         }
 
         private async Task MonitorServerAsync()
         {
-            _logger.LogDebug("Starting to monitor server");
+            if (_runningServerProcess != null)
+            {
+                _logger.LogDebug("Starting to monitor server");
 
-            var exitTask = _runningServerProcess!.WaitForExitAsync();
+                var exitTask = _runningServerProcess.WaitForExitAsync();
 
-            StartTimeoutTimer();
+                StartTimeoutTimer();
 
-            await exitTask;
+                await exitTask;
 
-            _logger.LogInformation("{Key} shut down with exit code {ExitCode}", Key, _runningServerProcess!.ExitCode);
+                _logger.LogInformation("{Key} shut down with exit code {ExitCode}", Key,
+                    _runningServerProcess.ExitCode);
+            }
 
             if (_shuttingDown)
             {
