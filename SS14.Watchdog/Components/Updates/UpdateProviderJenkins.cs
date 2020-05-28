@@ -150,10 +150,12 @@ namespace SS14.Watchdog.Components.Updates
                     var rsPath = Path.Combine(binPath, "Robust.Server");
                     if (File.Exists(rsPath))
                     {
-                        Process.Start(new ProcessStartInfo("chmod")
+                        var proc = Process.Start(new ProcessStartInfo("chmod")
                         {
                             ArgumentList = {"+x", rsPath}
                         });
+
+                        await proc.WaitForExitAsync(cancel);
                     }
                 }
 
