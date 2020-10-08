@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -68,6 +70,14 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
+            var instanceRoot = Path.Combine(Environment.CurrentDirectory, _serversOptions.InstanceRoot);
+            
+            if (!Directory.Exists(instanceRoot))
+            {
+                Directory.CreateDirectory(instanceRoot);
+                _logger.LogInformation($"Created InstanceRoot {instanceRoot}");
+            }
+            
             // Init server instances.
             foreach (var (key, instanceOptions) in _serversOptions.Instances)
             {

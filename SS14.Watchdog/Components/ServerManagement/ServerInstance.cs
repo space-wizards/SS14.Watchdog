@@ -107,6 +107,12 @@ namespace SS14.Watchdog.Components.ServerManagement
                     throw new ArgumentException($"Unknown update type: {instanceConfig.UpdateType}");
             }
 
+            if (!Directory.Exists(InstanceDir))
+            {
+                Directory.CreateDirectory(InstanceDir);
+                _logger.LogInformation($"Created InstanceDir {InstanceDir}");
+            }
+
             LoadData();
         }
 
