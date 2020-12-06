@@ -372,7 +372,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             {
                 if (_runningServerProcess != null)
                 {
-                    await SendShutdownNotificationAsync(cancellationToken);
+                    await ForceShutdownServerAsync(cancellationToken);
 
                     await _monitorTask!;
                 }
@@ -481,6 +481,56 @@ namespace SS14.Watchdog.Components.ServerManagement
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Bad HTTP status code on update notification: {status}", resp.StatusCode);
+            }
+        }
+
+        public async Task DoRestartCommandAsync(CancellationToken cancel = default)
+        {
+            await _stateLock.WaitAsync(cancel);
+
+            try
+            {
+                if (_runningServerProcess == null && _startupFailUpdateWait)
+                {
+                    _loadFailCount = 0;
+                    _startupFailUpdateWait = false;
+                    await StartLockedAsync();
+                    return;
+                }
+            }
+            finally
+            {
+                _stateLock.Release();
+            }
+
+            await ForceShutdownServerAsync(cancel);
+        }
+
+        public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
+        {
+            var proc = _runningServerProcess;
+            if (proc == null || proc.HasExited)
+            {
+                return;
+            }
+
+            try
+            {
+                await SendShutdownNotificationAsync(cancel);
+            }
+            catch (HttpRequestException e)
+            {
+                _logger.LogInformation(e, "Exception sending shutdown notification to server. Killing.");
+                proc.Kill();
+                return;
+            }
+
+            // Give it 5 seconds to shut down.
+            await Task.WhenAny(proc.WaitForExitAsync(cancel), Task.Delay(5000, cancel));
+
+            if (!proc.HasExited)
+            {
+                proc.Kill();
             }
         }
 
