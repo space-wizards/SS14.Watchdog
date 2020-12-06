@@ -377,7 +377,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                     await _monitorTask!;
                 }
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
                 _runningServerProcess?.Kill(true);
             }
@@ -418,7 +418,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                 await _stateLock.WaitAsync(token);
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
                 // It still lives.
                 _logger.LogTrace("Timeout broken, it lives.");
