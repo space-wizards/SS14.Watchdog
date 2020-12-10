@@ -195,26 +195,5 @@ namespace SS14.Watchdog.Components.Updates
 
             return jobInfo.LastSuccessfulBuild;
         }
-
-        [Pure]
-        private static string GetHostPlatformName()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return PlatformNameWindows;
-            }
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return PlatformNameLinux;
-            }
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                return PlatformNameMacOS;
-            }
-
-            throw new PlatformNotSupportedException();
-        }
     }
 }
