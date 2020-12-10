@@ -100,7 +100,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderGitConfiguration>();
 
-                    _updateProvider = new UpdateProviderGit(this, gitConfig, gitLogger);
+                    _updateProvider = new UpdateProviderGit(this, gitConfig, gitLogger, configuration);
                     break;
                 
                 case "Dummy":

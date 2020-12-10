@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using LibGit2Sharp;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Configuration.Updates;
@@ -20,37 +21,38 @@ namespace SS14.Watchdog.Components.Updates
         private readonly string _branch;
         private readonly ILogger<UpdateProviderGit> _logger;
         private readonly string _repoPath;
+        private readonly IConfiguration _configuration;
         
-        public UpdateProviderGit(ServerInstance serverInstanceInstance, UpdateProviderGitConfiguration configuration, ILogger<UpdateProviderGit> logger)
+        public UpdateProviderGit(ServerInstance serverInstanceInstance, UpdateProviderGitConfiguration configuration, ILogger<UpdateProviderGit> logger, IConfiguration config)
         {
             _serverInstance = serverInstanceInstance;
             _baseUrl = configuration.BaseUrl;
             _branch = configuration.Branch;
             _logger = logger;
             _repoPath = Path.Combine(_serverInstance.InstanceDir, "source");
+            _configuration = config;
         }
         
         public override Task<bool> CheckForUpdateAsync(string? currentVersion, CancellationToken cancel = default)
         {
-            if (currentVersion == null)
+            if (!Repository.IsValid(_repoPath) || currentVersion == null)
                 return Task.FromResult(true);
+            
 
             var logMessage = "";
             var update = false;
-            
-            using (var repository = new Repository(_repoPath))
-            {
-                var remote = repository.Network.Remotes["origin"];
-                var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
-                Commands.Fetch(repository, remote.Name, refSpecs, null, logMessage);
                 
-                var localBranch = repository.Branches[_branch];
-                var remoteBranch = localBranch.TrackedBranch;
+            using var repository = new Repository(_repoPath);
+            var remote = repository.Network.Remotes["origin"];
+            var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
+            Commands.Fetch(repository, remote.Name, refSpecs, null, logMessage);
+                
+            var localBranch = repository.Branches[_branch];
+            var remoteBranch = localBranch.TrackedBranch;
 
-                if (localBranch.Tip != remoteBranch.Tip)
-                    update = true;
-            }
-            
+            if (localBranch.Tip != remoteBranch.Tip || currentVersion != remoteBranch.Tip.ToString())
+                update = true;
+                
             _logger.LogInformation(logMessage);
             return Task.FromResult(update);
         }
@@ -59,16 +61,18 @@ namespace SS14.Watchdog.Components.Updates
         {
             try
             {
-                if (currentVersion == null)
+                if (!Repository.IsValid(_repoPath) || currentVersion == null)
                     TryClone();
 
-                _logger.LogTrace("Updating...");
-
                 using var repository = new Repository(_repoPath);
+
+
+                _logger.LogTrace("Updating...");
+                
                 var localBranch = repository.Branches[_branch];
                 var remoteBranch = localBranch.TrackedBranch;
 
-                Commands.Checkout(repository, localBranch);
+                localBranch = Commands.Checkout(repository, localBranch);
                 repository.Merge(remoteBranch,
                     new Signature("Watchdog", "telecommunications@spacestation14.io", DateTimeOffset.Now), null);
 
@@ -92,6 +96,9 @@ namespace SS14.Watchdog.Components.Updates
                 };
 
                 var binariesPath = Path.Combine(_serverInstance.InstanceDir, "binaries");
+                
+                var binariesRoot = new Uri(new Uri(_configuration["BaseUrl"]),
+                    $"instances/{_serverInstance.Key}/binaries/");
                 
                 process.Start();
                 await process.WaitForExitAsync(cancel);
@@ -150,12 +157,12 @@ namespace SS14.Watchdog.Components.Updates
                         return null;
                     }
 
-                    var download = Path.Combine(binariesPath, fileName);
+                    var download = new Uri(binariesRoot, fileName);
                     var hash = GetFileHash(diskFileName);
 
                     _logger.LogTrace("SHA256 hash for {fileName} is {hash}", fileName, hash);
 
-                    return new DownloadInfoPair(download, hash);
+                    return new DownloadInfoPair(download.ToString(), hash);
                 }
 
                 var revisionDescription = new RevisionDescription(
