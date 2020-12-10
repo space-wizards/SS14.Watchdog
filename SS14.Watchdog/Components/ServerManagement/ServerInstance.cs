@@ -67,7 +67,8 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public ServerInstance(string key, InstanceConfiguration instanceConfig, IConfiguration configuration,
             ILogger<UpdateProviderJenkins> jenkinsLogger, ServersConfiguration serversConfiguration,
-            ILogger<ServerInstance> logger, IBackgroundTaskQueue taskQueue, ILogger<UpdateProviderLocal> localLogger)
+            ILogger<ServerInstance> logger, IBackgroundTaskQueue taskQueue, ILogger<UpdateProviderLocal> localLogger,
+            ILogger<UpdateProviderGit> gitLogger)
         {
             Key = key;
             _instanceConfig = instanceConfig;
@@ -93,8 +94,15 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                     _updateProvider = new UpdateProviderLocal(this, localConfig, localLogger, configuration);
                     break;
+                
+                case "Git":
+                    var gitConfig = configuration
+                        .GetSection($"Servers:Instances:{key}:Updates")
+                        .Get<UpdateProviderGitConfiguration>();
 
-
+                    _updateProvider = new UpdateProviderGit(this, gitConfig, gitLogger);
+                    break;
+                
                 case "Dummy":
                     _updateProvider = new UpdateProviderDummy();
                     break;
