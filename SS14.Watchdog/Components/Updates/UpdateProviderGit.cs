@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using LibGit2Sharp;
@@ -171,6 +174,29 @@ namespace SS14.Watchdog.Components.Updates
                     GetInfoPair(PlatformNameLinux),
                     GetInfoPair(PlatformNameMacOS));
 
+                var build = new Build()
+                {
+                    Downloads = new Dictionary<string, string>()
+                    {
+                        {"linux", revisionDescription.LinuxInfo!.Download},
+                        {"macos", revisionDescription.MacOSInfo!.Download},
+                        {"windows", revisionDescription.WindowsInfo!.Download}
+                    },
+
+                    Hashes = new Dictionary<string, string>()
+                    {
+                        {"linux", revisionDescription.LinuxInfo!.Hash},
+                        {"macos", revisionDescription.MacOSInfo!.Hash},
+                        {"windows", revisionDescription.WindowsInfo!.Hash}
+                    },
+
+                    Version = revisionDescription.Version,
+
+                    ForkId = _baseUrl,
+                };
+
+                await File.WriteAllTextAsync(Path.Combine(binPath, "build.json"), JsonSerializer.Serialize(build), cancel);
+                
                 // ReSharper disable once RedundantTypeArgumentsOfMethod
                 return revisionDescription;
             }
@@ -180,6 +206,21 @@ namespace SS14.Watchdog.Components.Updates
 
                 return null;
             }
+        }
+
+        private class Build
+        {
+            [JsonPropertyName("downloads")]
+            public Dictionary<string, string> Downloads { get; set; }
+            
+            [JsonPropertyName("hashes")]
+            public Dictionary<string, string> Hashes { get; set; }
+            
+            [JsonPropertyName("version")]
+            public string Version { get; set; }
+            
+            [JsonPropertyName("fork_id")]
+            public string ForkId { get; set; }
         }
         
         private void TryClone()
