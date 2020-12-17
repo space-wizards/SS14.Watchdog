@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
-using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -15,7 +14,6 @@ using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.Updates;
 using SS14.Watchdog.Configuration;
 using SS14.Watchdog.Configuration.Updates;
-using SS14.Watchdog.Utility;
 
 namespace SS14.Watchdog.Components.ServerManagement
 {
@@ -51,7 +49,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly ILogger<ServerInstance> _logger;
         private readonly IBackgroundTaskQueue _taskQueue;
 
-        private RevisionDescription? _currentRevision;
+        private string? _currentRevision;
         private bool _updateOnRestart = true;
         private bool _shuttingDown;
 
@@ -183,16 +181,18 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                 if (_updateProvider != null)
                 {
-                    var hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision?.Version);
-                    _logger.LogDebug("Update available.");
+                    var hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision);
+                    _logger.LogDebug("Update available: {available}.", hasUpdate);
 
                     if (hasUpdate)
                     {
-                        var newRevision = await _updateProvider.RunUpdateAsync(_currentRevision?.Version,
+                        var newRevision = await _updateProvider.RunUpdateAsync(
+                            _currentRevision,
                             Path.Combine(InstanceDir, "bin"));
 
-                        _logger.LogDebug("Updated from {current} to {new}.", _currentRevision?.Version ?? "<none>",
-                            newRevision?.Version);
+                        _logger.LogDebug("Updated from {current} to {new}.",
+                            _currentRevision ?? "<none>",
+                            newRevision);
 
                         if (newRevision != null)
                         {
@@ -228,40 +228,12 @@ namespace SS14.Watchdog.Components.ServerManagement
             };
 
             // Add current build information.
-            if (_currentRevision != null)
+            if (_currentRevision != null && _updateProvider != null)
             {
-                // Note that build.fork_id is NOT set. Set it in config.toml instead.
-                startInfo.ArgumentList.Add("--cvar");
-                startInfo.ArgumentList.Add($"build.version={_currentRevision.Version}");
-
-                if (_currentRevision.WindowsInfo != null)
+                foreach (var (cVar, value) in _updateProvider.GetLaunchCVarOverrides(_currentRevision))
                 {
-                    var info = _currentRevision.WindowsInfo;
-
                     startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.download_url_windows={info.Download}");
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.hash_windows={info.Hash}");
-                }
-
-                if (_currentRevision.LinuxInfo != null)
-                {
-                    var info = _currentRevision.LinuxInfo;
-
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.download_url_linux={info.Download}");
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.hash_linux={info.Hash}");
-                }
-
-                if (_currentRevision.MacOSInfo != null)
-                {
-                    var info = _currentRevision.MacOSInfo;
-
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.download_url_macos={info.Download}");
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.hash_macos={info.Hash}");
+                    startInfo.ArgumentList.Add($"{cVar}={value}");
                 }
             }
 
@@ -446,8 +418,8 @@ namespace SS14.Watchdog.Components.ServerManagement
             _logger.LogDebug("Received update notification.");
             _taskQueue.QueueTask(async cancel =>
             {
-                var updateAvailable = await _updateProvider.CheckForUpdateAsync(_currentRevision?.Version, cancel);
-                _logger.LogTrace("Update is indeed available.");
+                var updateAvailable = await _updateProvider.CheckForUpdateAsync(_currentRevision, cancel);
+                _logger.LogTrace("Update available? {available}", updateAvailable);
 
                 await _stateLock.WaitAsync(cancel);
                 try

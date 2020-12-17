@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -37,14 +38,20 @@ namespace SS14.Watchdog.Components.Updates
             return Task.FromResult(currentVersion != _specificConfiguration.CurrentVersion);
         }
 
-        public override Task<RevisionDescription?> RunUpdateAsync(string? currentVersion, string binPath,
+        public override Task<string?> RunUpdateAsync(string? currentVersion, string binPath,
             CancellationToken cancel = default)
         {
             if (currentVersion == _specificConfiguration.CurrentVersion)
             {
-                return Task.FromResult<RevisionDescription?>(null);
+                return Task.FromResult<string?>(null);
             }
 
+            // ReSharper disable once RedundantTypeArgumentsOfMethod
+            return Task.FromResult<string?>(_specificConfiguration.CurrentVersion);
+        }
+
+        public override IEnumerable<KeyValuePair<string, string>> GetLaunchCVarOverrides(string currentVersion)
+        {
             var binariesPath = Path.Combine(_serverInstance.InstanceDir, "binaries");
             if (!Directory.Exists(binariesPath))
             {
@@ -52,35 +59,17 @@ namespace SS14.Watchdog.Components.Updates
                     "Expected binaries/ directory containing all client binaries in the instance folder.");
             }
 
-            var binariesRoot = new Uri(new Uri(_configuration["BaseUrl"]),
+            var binariesRoot = new Uri(
+                new Uri(_configuration["BaseUrl"]),
                 $"instances/{_serverInstance.Key}/binaries/");
 
-            DownloadInfoPair? GetInfoPair(string platform)
-            {
-                var fileName = GetBuildFilename(platform);
-                var diskFileName = Path.Combine(binariesPath, fileName);
+            yield return new KeyValuePair<string, string>(
+                "build.download_url",
+                new Uri(binariesRoot, ClientZipName).ToString());
 
-                if (!File.Exists(diskFileName))
-                {
-                    return null;
-                }
+            var hash = GetFileHash(Path.Combine(binariesPath, ClientZipName));
 
-                var download = new Uri(binariesRoot, fileName);
-                var hash = GetFileHash(diskFileName);
-
-                _logger.LogTrace("SHA256 hash for {fileName} is {hash}", fileName, hash);
-
-                return new DownloadInfoPair(download.ToString(), hash);
-            }
-
-            var revisionDescription = new RevisionDescription(
-                _specificConfiguration.CurrentVersion,
-                GetInfoPair(PlatformNameWindows),
-                GetInfoPair(PlatformNameLinux),
-                GetInfoPair(PlatformNameMacOS));
-
-            // ReSharper disable once RedundantTypeArgumentsOfMethod
-            return Task.FromResult<RevisionDescription?>(revisionDescription);
+            yield return new KeyValuePair<string, string>("build.hash", hash);
         }
 
         private static string GetFileHash(string filePath)

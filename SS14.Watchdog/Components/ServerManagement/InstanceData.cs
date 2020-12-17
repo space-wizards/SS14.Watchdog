@@ -6,6 +6,6 @@ namespace SS14.Watchdog.Components.ServerManagement
 
     public sealed class InstanceData
     {
-        public RevisionDescription? CurrentRevision { get; set; }
+        public string? CurrentRevision { get; set; }
     }
 }
