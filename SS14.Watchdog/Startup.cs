@@ -30,11 +30,11 @@ namespace SS14.Watchdog
             services.AddControllers();
 
             services.AddSingleton<ServerManager>();
-            services.AddSingleton<IServerManager>(p => p.GetService<ServerManager>());
+            services.AddSingleton<IServerManager>(p => p.GetService<ServerManager>()!);
             services.AddHostedService(p => p.GetService<ServerManager>());
 
             services.AddSingleton<BackgroundTaskQueue>();
-            services.AddSingleton<IBackgroundTaskQueue>(p => p.GetService<BackgroundTaskQueue>());
+            services.AddSingleton<IBackgroundTaskQueue>(p => p.GetService<BackgroundTaskQueue>()!);
             services.AddHostedService(p => p.GetService<BackgroundTaskQueue>());
         }
 

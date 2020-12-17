@@ -149,7 +149,7 @@ namespace SS14.Watchdog.Components.Updates
 
             var jobInfo = JsonSerializer.Deserialize<JenkinsJobInfo>(await jobDataResponse.Content.ReadAsStringAsync(cancel));
 
-            return jobInfo.LastSuccessfulBuild;
+            return jobInfo!.LastSuccessfulBuild;
         }
 
         [Pure]

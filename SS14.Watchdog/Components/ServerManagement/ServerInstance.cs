@@ -129,7 +129,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                 return;
             }
 
-            var data = JsonSerializer.Deserialize<InstanceData>(fileData);
+            var data = JsonSerializer.Deserialize<InstanceData>(fileData)!;
 
             // Actually copy data over.
             _currentRevision = data.CurrentRevision;
@@ -241,7 +241,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             try
             {
                 _runningServerProcess = Process.Start(startInfo);
-                _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess.Id);
+                _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess!.Id);
             }
             catch (Exception e)
             {
@@ -448,7 +448,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         private async Task SendUpdateNotificationAsync(CancellationToken cancel = default)
         {
-            var resp = await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null, cancel);
+            var resp = await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null!, cancel);
 
             if (!resp.IsSuccessStatusCode)
             {
