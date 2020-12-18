@@ -60,7 +60,7 @@ namespace SS14.Watchdog.Components.Updates
             return Task.FromResult(update);
         }
 
-        public override async Task<RevisionDescription?> RunUpdateAsync(string? currentVersion, string binPath, CancellationToken cancel = default)
+        public override async Task<string?> RunUpdateAsync(string? currentVersion, string binPath, CancellationToken cancel = default)
         {
             try
             {
@@ -84,17 +84,47 @@ namespace SS14.Watchdog.Components.Updates
                     repository.Submodules.Update(submodule.Name, null);
                 }
 
+                using var engineRepository = new Repository(Path.Combine(_repoPath, "RobustToolbox"));
+
+                var engineVersion = engineRepository.Describe(engineRepository.Branches["master"].Tip, 
+                                        new DescribeOptions(){MinimumCommitIdAbbreviatedSize = 0, Strategy = DescribeStrategy.Tags})?.Trim()
+                                    ?? throw new NullReferenceException("Can't find version for engine submodule.");
+
+                if (!engineVersion.StartsWith('v'))
+                    throw new InvalidDataException($"Engine submodule tag \"{engineVersion}\" doesn't start with v!");
+
+                engineVersion = engineVersion.Substring(1);
+
                 // Now we build and package it.
 
-                _logger.LogTrace("Building...");
-
-                var process = new Process
+                var processClientBuild = new Process
                 {
                     StartInfo =
                     {
                         FileName = "python", CreateNoWindow = true, UseShellExecute = true,
                         WorkingDirectory = _repoPath,
-                        Arguments = "Tools/package_release_build.py -p windows mac linux linux-arm64"
+                        Arguments = "Tools/package_client_build.py"
+                    },
+                };
+
+                // Platform to build the server for.
+                var serverPlatform = GetHostPlatformName() switch
+                {
+                    PlatformNameWindows => "windows",
+                    PlatformNameMacOS => "mac",
+                    PlatformNameLinux => RuntimeInformation.OSArchitecture == Architecture.Arm64
+                        ? "linux-arm64"
+                        : "linux",
+                    _ => throw new PlatformNotSupportedException()
+                };
+
+                var processServerBuild = new Process
+                {
+                    StartInfo =
+                    {
+                        FileName = "python", CreateNoWindow = true, UseShellExecute = true,
+                        WorkingDirectory = _repoPath,
+                        Arguments = $"Tools/package_server_build.py -p {serverPlatform}"
                     },
                 };
 
@@ -103,14 +133,18 @@ namespace SS14.Watchdog.Components.Updates
                 var binariesRoot = new Uri(new Uri(_configuration["BaseUrl"]),
                     $"instances/{_serverInstance.Key}/binaries/");
                 
-                process.Start();
-                await process.WaitForExitAsync(cancel);
-
-                foreach (var file in Directory.EnumerateFiles(Path.Combine(_repoPath, "release")))
-                {
-                    File.Move(file, Path.Combine(binariesPath, Path.GetFileName(file)), true);
-                }
+                _logger.LogTrace("Building client packages...");
                 
+                processClientBuild.Start();
+                await processClientBuild.WaitForExitAsync(cancel);
+                
+                File.Move(Path.Combine(_repoPath, "release", ClientZipName), Path.Combine(binariesPath, ClientZipName), true);
+                
+                _logger.LogTrace("Building server packages...");
+                
+                processServerBuild.Start();
+                await processServerBuild.WaitForExitAsync(cancel);
+
                 _logger.LogTrace("Applying server update.");
                 
                 if (Directory.Exists(binPath))
@@ -122,9 +156,9 @@ namespace SS14.Watchdog.Components.Updates
 
                 _logger.LogTrace("Extracting zip file");
 
-                var name = $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip";
+                var serverPackage = Path.Combine(_repoPath, "releases", $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
 
-                var stream = File.Open(Path.Combine(binariesPath, name), FileMode.Open);
+                var stream = File.Open(serverPackage, FileMode.Open);
                 
                 // Reset file position so we can extract.
                 stream.Seek(0, SeekOrigin.Begin);
@@ -132,6 +166,9 @@ namespace SS14.Watchdog.Components.Updates
                 // Actually extract.
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
                 archive.ExtractToDirectory(binPath);
+                
+                // Remove the package now that it's extracted.
+                File.Delete(serverPackage);
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
                     RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -150,55 +187,19 @@ namespace SS14.Watchdog.Components.Updates
                     }
                 }
 
-                DownloadInfoPair? GetInfoPair(string platform)
-                {
-                    var fileName = GetBuildFilename(platform);
-                    var diskFileName = Path.Combine(binariesPath, fileName);
-
-                    if (!File.Exists(diskFileName))
-                    {
-                        return null;
-                    }
-
-                    var download = new Uri(binariesRoot, fileName);
-                    var hash = GetFileHash(diskFileName);
-
-                    _logger.LogTrace("SHA256 hash for {fileName} is {hash}", fileName, hash);
-
-                    return new DownloadInfoPair(download.ToString(), hash);
-                }
-
-                var revisionDescription = new RevisionDescription(
-                    localBranch.Tip.ToString(),
-                    GetInfoPair(PlatformNameWindows),
-                    GetInfoPair(PlatformNameLinux),
-                    GetInfoPair(PlatformNameMacOS));
-
                 var build = new Build()
                 {
-                    Downloads = new Dictionary<string, string>()
-                    {
-                        {"linux", revisionDescription.LinuxInfo!.Download},
-                        {"macos", revisionDescription.MacOSInfo!.Download},
-                        {"windows", revisionDescription.WindowsInfo!.Download}
-                    },
-
-                    Hashes = new Dictionary<string, string>()
-                    {
-                        {"linux", revisionDescription.LinuxInfo!.Hash},
-                        {"macos", revisionDescription.MacOSInfo!.Hash},
-                        {"windows", revisionDescription.WindowsInfo!.Hash}
-                    },
-
-                    Version = revisionDescription.Version,
-
+                    Download = new Uri(binariesRoot, ClientZipName).ToString(),
+                    Hash = GetFileHash(Path.Combine(binariesPath, ClientZipName)),
+                    Version = localBranch.Tip.ToString(),
+                    EngineVersion = engineVersion,
                     ForkId = _baseUrl,
                 };
 
                 await File.WriteAllTextAsync(Path.Combine(binPath, "build.json"), JsonSerializer.Serialize(build), cancel);
                 
                 // ReSharper disable once RedundantTypeArgumentsOfMethod
-                return revisionDescription;
+                return localBranch.Tip.ToString();
             }
             catch (Exception e)
             {
@@ -210,14 +211,17 @@ namespace SS14.Watchdog.Components.Updates
 
         private class Build
         {
-            [JsonPropertyName("downloads")]
-            public Dictionary<string, string> Downloads { get; set; }
+            [JsonPropertyName("download")]
+            public string Download { get; set; }
             
-            [JsonPropertyName("hashes")]
-            public Dictionary<string, string> Hashes { get; set; }
+            [JsonPropertyName("hash")]
+            public string Hash { get; set; }
             
             [JsonPropertyName("version")]
             public string Version { get; set; }
+            
+            [JsonPropertyName("engine_version")]
+            public string EngineVersion { get; set; }
             
             [JsonPropertyName("fork_id")]
             public string ForkId { get; set; }

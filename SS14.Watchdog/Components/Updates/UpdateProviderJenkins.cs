@@ -89,7 +89,7 @@ namespace SS14.Watchdog.Components.Updates
                 // Create temporary file to download binary into (not doing this in memory).
                 await using var tempFile = File.Open(Path.GetTempFileName(), FileMode.Open, FileAccess.ReadWrite);
                 // Download URI for server binary.
-                var serverDownload = new Uri(downloadRootUri, $"SS14.Server_{GetHostPlatformName()}_x64.zip");
+                var serverDownload = new Uri(downloadRootUri, $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
 
                 _logger.LogTrace("Downloading server binary from {download} to {tempFile}", serverDownload,
                     tempFile.Name);

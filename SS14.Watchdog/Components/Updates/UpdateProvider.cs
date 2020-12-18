@@ -46,12 +46,6 @@ namespace SS14.Watchdog.Components.Updates
         }
 
         [Pure]
-        protected static string GetBuildFilename(string platform)
-        {
-            return $"SS14.Client_{platform}_x64.zip";
-        }
-        
-        [Pure]
         protected static string GetHostPlatformName()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -81,11 +75,15 @@ namespace SS14.Watchdog.Components.Updates
                     return "x64";
 
                 case Architecture.Arm64:
+                    // Only Linux is supported on ARM64.
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                        throw new PlatformNotSupportedException();
+                    
                     return "ARM64";
 
                 // Any other architecture is unsupported.
                 default:
-                    throw new ArgumentOutOfRangeException();
+                    throw new PlatformNotSupportedException();
             }
         }
         
