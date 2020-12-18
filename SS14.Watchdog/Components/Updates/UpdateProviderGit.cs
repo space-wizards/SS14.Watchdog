@@ -156,7 +156,7 @@ namespace SS14.Watchdog.Components.Updates
 
                 _logger.LogTrace("Extracting zip file");
 
-                var serverPackage = Path.Combine(_repoPath, "releases", $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
+                var serverPackage = Path.Combine(_repoPath, "release", $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
 
                 var stream = File.Open(serverPackage, FileMode.Open);
                 
