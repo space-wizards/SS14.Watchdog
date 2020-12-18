@@ -3,6 +3,8 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
@@ -14,6 +16,8 @@ namespace SS14.Watchdog.Components.Updates
     /// </summary>
     public abstract class UpdateProvider
     {
+        protected const string ClientZipName = "SS14.Client.zip";
+
         protected const string PlatformNameWindows = "Windows";
         protected const string PlatformNameLinux = "Linux";
         protected const string PlatformNameMacOS = "macOS";
@@ -32,9 +36,14 @@ namespace SS14.Watchdog.Components.Updates
         /// <param name="currentVersion">The current version the server is on.</param>
         /// <param name="binPath">The bin path of the server instance, to update into.</param>
         /// <param name="cancel">Cancellation token.</param>
-        /// <returns>Description of the update, including version number and download URLs for clients.</returns>
-        public abstract Task<RevisionDescription?> RunUpdateAsync(string? currentVersion, string binPath,
+        /// <returns>The version updated to if an update happened successfully, null other.</returns>
+        public abstract Task<string?> RunUpdateAsync(string? currentVersion, string binPath,
             CancellationToken cancel = default);
+
+        public virtual IEnumerable<KeyValuePair<string, string>> GetLaunchCVarOverrides(string currentVersion)
+        {
+            return Enumerable.Empty<KeyValuePair<string, string>>();
+        }
 
         [Pure]
         protected static string GetBuildFilename(string platform)

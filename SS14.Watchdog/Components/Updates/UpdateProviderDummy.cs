@@ -14,7 +14,7 @@ namespace SS14.Watchdog.Components.Updates
             return Task.FromResult(true);
         }
 
-        public override Task<RevisionDescription?> RunUpdateAsync(string? currentVersion, string binPath, CancellationToken cancel = default)
+        public override Task<string?> RunUpdateAsync(string? currentVersion, string binPath, CancellationToken cancel = default)
         {
             string newNumber;
             if (currentVersion == null)
@@ -28,9 +28,7 @@ namespace SS14.Watchdog.Components.Updates
                 newNumber = $"{p + 1}";
             }
 
-            var dummy = new DownloadInfoPair("FOO", "BAR");
-            // ReSharper disable once RedundantTypeArgumentsOfMethod
-            return Task.FromResult<RevisionDescription?>(new RevisionDescription(newNumber, dummy, dummy, dummy));
+            return Task.FromResult<string?>(newNumber);
         }
     }
 }

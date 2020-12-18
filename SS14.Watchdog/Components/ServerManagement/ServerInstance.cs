@@ -2,7 +2,6 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
-using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -15,7 +14,6 @@ using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.Updates;
 using SS14.Watchdog.Configuration;
 using SS14.Watchdog.Configuration.Updates;
-using SS14.Watchdog.Utility;
 
 namespace SS14.Watchdog.Components.ServerManagement
 {
@@ -51,7 +49,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly ILogger<ServerInstance> _logger;
         private readonly IBackgroundTaskQueue _taskQueue;
 
-        private RevisionDescription? _currentRevision;
+        private string? _currentRevision;
         private bool _updateOnRestart = true;
         private bool _shuttingDown;
 
@@ -139,7 +137,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                 return;
             }
 
-            var data = JsonSerializer.Deserialize<InstanceData>(fileData);
+            var data = JsonSerializer.Deserialize<InstanceData>(fileData)!;
 
             // Actually copy data over.
             _currentRevision = data.CurrentRevision;
@@ -191,16 +189,18 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                 if (_updateProvider != null)
                 {
-                    var hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision?.Version);
-                    _logger.LogDebug("Update available.");
+                    var hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision);
+                    _logger.LogDebug("Update available: {available}.", hasUpdate);
 
                     if (hasUpdate)
                     {
-                        var newRevision = await _updateProvider.RunUpdateAsync(_currentRevision?.Version,
+                        var newRevision = await _updateProvider.RunUpdateAsync(
+                            _currentRevision,
                             Path.Combine(InstanceDir, "bin"));
 
-                        _logger.LogDebug("Updated from {current} to {new}.", _currentRevision?.Version ?? "<none>",
-                            newRevision?.Version);
+                        _logger.LogDebug("Updated from {current} to {new}.",
+                            _currentRevision ?? "<none>",
+                            newRevision);
 
                         if (newRevision != null)
                         {
@@ -236,40 +236,12 @@ namespace SS14.Watchdog.Components.ServerManagement
             };
 
             // Add current build information.
-            if (_currentRevision != null)
+            if (_currentRevision != null && _updateProvider != null)
             {
-                // Note that build.fork_id is NOT set. Set it in config.toml instead.
-                startInfo.ArgumentList.Add("--cvar");
-                startInfo.ArgumentList.Add($"build.version={_currentRevision.Version}");
-
-                if (_currentRevision.WindowsInfo != null)
+                foreach (var (cVar, value) in _updateProvider.GetLaunchCVarOverrides(_currentRevision))
                 {
-                    var info = _currentRevision.WindowsInfo;
-
                     startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.download_url_windows={info.Download}");
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.hash_windows={info.Hash}");
-                }
-
-                if (_currentRevision.LinuxInfo != null)
-                {
-                    var info = _currentRevision.LinuxInfo;
-
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.download_url_linux={info.Download}");
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.hash_linux={info.Hash}");
-                }
-
-                if (_currentRevision.MacOSInfo != null)
-                {
-                    var info = _currentRevision.MacOSInfo;
-
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.download_url_macos={info.Download}");
-                    startInfo.ArgumentList.Add("--cvar");
-                    startInfo.ArgumentList.Add($"build.hash_macos={info.Hash}");
+                    startInfo.ArgumentList.Add($"{cVar}={value}");
                 }
             }
 
@@ -277,7 +249,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             try
             {
                 _runningServerProcess = Process.Start(startInfo);
-                _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess.Id);
+                _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess!.Id);
             }
             catch (Exception e)
             {
@@ -380,12 +352,12 @@ namespace SS14.Watchdog.Components.ServerManagement
             {
                 if (_runningServerProcess != null)
                 {
-                    await SendShutdownNotificationAsync(cancellationToken);
+                    await ForceShutdownServerAsync(cancellationToken);
 
                     await _monitorTask!;
                 }
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
                 _runningServerProcess?.Kill(true);
             }
@@ -426,7 +398,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                 await _stateLock.WaitAsync(token);
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
                 // It still lives.
                 _logger.LogTrace("Timeout broken, it lives.");
@@ -454,8 +426,8 @@ namespace SS14.Watchdog.Components.ServerManagement
             _logger.LogDebug("Received update notification.");
             _taskQueue.QueueTask(async cancel =>
             {
-                var updateAvailable = await _updateProvider.CheckForUpdateAsync(_currentRevision?.Version, cancel);
-                _logger.LogTrace("Update is indeed available.");
+                var updateAvailable = await _updateProvider.CheckForUpdateAsync(_currentRevision, cancel);
+                _logger.LogTrace("Update available? {available}", updateAvailable);
 
                 await _stateLock.WaitAsync(cancel);
                 try
@@ -484,11 +456,61 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         private async Task SendUpdateNotificationAsync(CancellationToken cancel = default)
         {
-            var resp = await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null, cancel);
+            var resp = await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null!, cancel);
 
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Bad HTTP status code on update notification: {status}", resp.StatusCode);
+            }
+        }
+
+        public async Task DoRestartCommandAsync(CancellationToken cancel = default)
+        {
+            await _stateLock.WaitAsync(cancel);
+
+            try
+            {
+                if (_runningServerProcess == null && _startupFailUpdateWait)
+                {
+                    _loadFailCount = 0;
+                    _startupFailUpdateWait = false;
+                    await StartLockedAsync();
+                    return;
+                }
+            }
+            finally
+            {
+                _stateLock.Release();
+            }
+
+            await ForceShutdownServerAsync(cancel);
+        }
+
+        public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
+        {
+            var proc = _runningServerProcess;
+            if (proc == null || proc.HasExited)
+            {
+                return;
+            }
+
+            try
+            {
+                await SendShutdownNotificationAsync(cancel);
+            }
+            catch (HttpRequestException e)
+            {
+                _logger.LogInformation(e, "Exception sending shutdown notification to server. Killing.");
+                proc.Kill();
+                return;
+            }
+
+            // Give it 5 seconds to shut down.
+            await Task.WhenAny(proc.WaitForExitAsync(cancel), Task.Delay(5000, cancel));
+
+            if (!proc.HasExited)
+            {
+                proc.Kill();
             }
         }
 

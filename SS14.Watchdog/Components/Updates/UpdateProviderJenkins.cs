@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -10,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
+using Mono.Unix;
 using SS14.Watchdog.Configuration.Updates;
 using SS14.Watchdog.Utility;
 
@@ -57,7 +57,8 @@ namespace SS14.Watchdog.Components.Updates
             return false;
         }
 
-        public override async Task<RevisionDescription?> RunUpdateAsync(string? currentVersion,
+        public override async Task<string?> RunUpdateAsync(
+            string? currentVersion,
             string binPath,
             CancellationToken cancel = default)
         {
@@ -85,35 +86,6 @@ namespace SS14.Watchdog.Components.Updates
 
                 var downloadRootUri = new Uri($"{_baseUrl}/job/{_jobName}/{buildRef.Number}/artifact/release/");
 
-                async Task<string> GetHash(string platform)
-                {
-                    var url = new Uri(downloadRootUri, $"{GetBuildFilename(platform)}.sha256");
-                    var resp = await _httpClient.GetAsync(url, cancel);
-                    resp.EnsureSuccessStatusCode();
-
-                    return (await resp.Content.ReadAsStringAsync()).Trim();
-                }
-
-                Uri PlatformUrl(string platform)
-                {
-                    return new Uri(downloadRootUri, Uri.EscapeUriString(GetBuildFilename(platform)));
-                }
-
-                async Task<DownloadInfoPair> PlatformInfo(string platform)
-                {
-                    var download = PlatformUrl(platform).ToString();
-                    var hash = await GetHash(platform);
-                    return new DownloadInfoPair(download, hash);
-                }
-
-                _logger.LogTrace("Fetching revision information from Jenkins...");
-
-                // Get revision information that the server instance needs.
-                var revision = new RevisionDescription(buildRef.Number.ToString(CultureInfo.InvariantCulture),
-                    await PlatformInfo(PlatformNameWindows),
-                    await PlatformInfo(PlatformNameLinux),
-                    await PlatformInfo(PlatformNameMacOS));
-
                 // Create temporary file to download binary into (not doing this in memory).
                 await using var tempFile = File.Open(Path.GetTempFileName(), FileMode.Open, FileAccess.ReadWrite);
                 // Download URI for server binary.
@@ -124,7 +96,7 @@ namespace SS14.Watchdog.Components.Updates
 
                 // Download to file...
                 var resp = await _httpClient.GetAsync(serverDownload, cancel);
-                await resp.Content.CopyToAsync(tempFile);
+                await resp.Content.CopyToAsync(tempFile, cancel);
 
                 _logger.LogTrace("Deleting old bin directory ({binPath})", binPath);
                 if (Directory.Exists(binPath))
@@ -150,36 +122,20 @@ namespace SS14.Watchdog.Components.Updates
                     var rsPath = Path.Combine(binPath, "Robust.Server");
                     if (File.Exists(rsPath))
                     {
-                        var proc = Process.Start(new ProcessStartInfo("chmod")
-                        {
-                            ArgumentList = {"+x", rsPath}
-                        });
-
-                        await proc.WaitForExitAsync(cancel);
+                        var f = new UnixFileInfo(rsPath);
+                        f.FileAccessPermissions |=
+                            FileAccessPermissions.UserExecute | FileAccessPermissions.GroupExecute |
+                            FileAccessPermissions.OtherExecute;
                     }
                 }
 
-                return revision;
+                return buildRef.Number.ToString(CultureInfo.InvariantCulture);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, "Failed to run update!");
 
                 return null;
-            }
-        }
-
-        private static void ClearDirectory(string binPath)
-        {
-            var dirInfo = new DirectoryInfo(binPath);
-            foreach (var file in dirInfo.EnumerateFiles())
-            {
-                file.Delete();
-            }
-
-            foreach (var dir in dirInfo.EnumerateDirectories())
-            {
-                dir.Delete(true);
             }
         }
 
@@ -191,9 +147,9 @@ namespace SS14.Watchdog.Components.Updates
 
             jobDataResponse.EnsureSuccessStatusCode();
 
-            var jobInfo = JsonSerializer.Deserialize<JenkinsJobInfo>(await jobDataResponse.Content.ReadAsStringAsync());
+            var jobInfo = JsonSerializer.Deserialize<JenkinsJobInfo>(await jobDataResponse.Content.ReadAsStringAsync(cancel));
 
-            return jobInfo.LastSuccessfulBuild;
+            return jobInfo!.LastSuccessfulBuild;
         }
     }
 }

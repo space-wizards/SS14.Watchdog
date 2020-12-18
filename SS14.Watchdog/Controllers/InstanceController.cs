@@ -26,7 +26,7 @@ namespace SS14.Watchdog.Controllers
                 return failure;
             }
 
-            await instance.SendShutdownNotificationAsync();
+            await instance.DoRestartCommandAsync();
             return Ok();
         }
 
