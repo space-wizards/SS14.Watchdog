@@ -69,15 +69,16 @@ namespace SS14.Watchdog.Components.Updates
 
                 using var repository = new Repository(_repoPath);
 
+                var remote = repository.Network.Remotes["origin"];
+                Commands.Fetch(repository, remote.Name, remote.FetchRefSpecs.Select(x => x.Specification),
+                    null, null);
 
                 _logger.LogTrace("Updating...");
-                
-                var localBranch = repository.Branches[_branch];
-                var remoteBranch = localBranch.TrackedBranch;
 
-                localBranch = Commands.Checkout(repository, localBranch);
-                repository.Merge(remoteBranch,
-                    new Signature("Watchdog", "telecommunications@spacestation14.io", DateTimeOffset.Now), null);
+                Commands.Pull(repository, new Signature("Watchdog", "telecommunications@spacestation14.io", DateTimeOffset.Now), null);
+                var localBranch = Commands.Checkout(repository, repository.Branches[_branch]);
+                
+                _logger.LogDebug($"Went from {currentVersion} to {localBranch.Tip}");
 
                 foreach (var submodule in repository.Submodules)
                 {
