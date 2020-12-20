@@ -83,6 +83,7 @@ namespace SS14.Watchdog.Components.Updates
 
                 foreach (var submodule in repository.Submodules)
                 {
+                    _logger.LogTrace($"Updating submodule {submodule.Name}");
                     repository.Submodules.Update(submodule.Name, null);
                 }
 
