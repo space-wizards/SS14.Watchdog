@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using LibGit2Sharp;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Mono.Unix;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Configuration.Updates;
 
@@ -172,16 +173,14 @@ namespace SS14.Watchdog.Components.Updates
                     RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
                     // chmod +x Robust.Server
-
+                    
                     var rsPath = Path.Combine(binPath, "Robust.Server");
                     if (File.Exists(rsPath))
                     {
-                        var proc = Process.Start(new ProcessStartInfo("chmod")
-                        {
-                            ArgumentList = {"+x", rsPath}
-                        });
-
-                        await proc!.WaitForExitAsync(cancel);
+                        var f = new UnixFileInfo(rsPath);
+                        f.FileAccessPermissions |=
+                            FileAccessPermissions.UserExecute | FileAccessPermissions.GroupExecute |
+                            FileAccessPermissions.OtherExecute;
                     }
                 }
 
