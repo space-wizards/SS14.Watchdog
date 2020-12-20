@@ -89,7 +89,7 @@ namespace SS14.Watchdog.Components.Updates
                 // Create temporary file to download binary into (not doing this in memory).
                 await using var tempFile = File.Open(Path.GetTempFileName(), FileMode.Open, FileAccess.ReadWrite);
                 // Download URI for server binary.
-                var serverDownload = new Uri(downloadRootUri, $"SS14.Server_{GetHostPlatformName()}_x64.zip");
+                var serverDownload = new Uri(downloadRootUri, $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
 
                 _logger.LogTrace("Downloading server binary from {download} to {tempFile}", serverDownload,
                     tempFile.Name);
@@ -150,27 +150,6 @@ namespace SS14.Watchdog.Components.Updates
             var jobInfo = JsonSerializer.Deserialize<JenkinsJobInfo>(await jobDataResponse.Content.ReadAsStringAsync(cancel));
 
             return jobInfo!.LastSuccessfulBuild;
-        }
-
-        [Pure]
-        private static string GetHostPlatformName()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-            {
-                return PlatformNameWindows;
-            }
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-            {
-                return PlatformNameLinux;
-            }
-
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-            {
-                return PlatformNameMacOS;
-            }
-
-            throw new PlatformNotSupportedException();
         }
     }
 }

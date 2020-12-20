@@ -71,25 +71,5 @@ namespace SS14.Watchdog.Components.Updates
 
             yield return new KeyValuePair<string, string>("build.hash", hash);
         }
-
-        private static string GetFileHash(string filePath)
-        {
-            using var file = File.OpenRead(filePath);
-            using var sha = SHA256.Create();
-
-            return ByteArrayToString(sha.ComputeHash(file));
-        }
-
-        // https://stackoverflow.com/a/311179/4678631
-        private static string ByteArrayToString(byte[] ba)
-        {
-            var hex = new StringBuilder(ba.Length * 2);
-            foreach (var b in ba)
-            {
-                hex.AppendFormat("{0:x2}", b);
-            }
-
-            return hex.ToString();
-        }
     }
 }

@@ -19,6 +19,11 @@ Servers:
       #Updates:
       #  CurrentVersion: "honk2"
       
+      #UpdateType: "Git"
+      #Updates:
+      #  BaseUrl: "https://github.com/space-wizards/space-station-14.git"
+      #  Branch: "master"
+
       UpdateType: "Jenkins"
       Updates:
         BaseUrl: "https://builds.spacestation14.io/jenkins"

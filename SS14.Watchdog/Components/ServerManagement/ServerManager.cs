@@ -22,6 +22,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly ILogger<ServerManager> _logger;
         private readonly ILogger<UpdateProviderJenkins> _jenkinsLogger;
         private readonly ILogger<UpdateProviderLocal> _localLogger;
+        private readonly ILogger<UpdateProviderGit> _gitLogger;
         private readonly ILogger<ServerInstance> _serverInstanceLogger;
         private readonly IBackgroundTaskQueue _taskQueue;
         private readonly IConfiguration _configuration;
@@ -34,7 +35,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             IOptions<ServersConfiguration> instancesOptions,
             ILogger<ServerManager> logger, IConfiguration configuration, ILogger<UpdateProviderJenkins> jenkinsLogger,
             ILogger<ServerInstance> serverInstanceLogger, IBackgroundTaskQueue taskQueue,
-            ILogger<UpdateProviderLocal> localLogger)
+            ILogger<UpdateProviderLocal> localLogger, ILogger<UpdateProviderGit> gitLogger)
         {
             _logger = logger;
             _configuration = configuration;
@@ -42,6 +43,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             _serverInstanceLogger = serverInstanceLogger;
             _taskQueue = taskQueue;
             _localLogger = localLogger;
+            _gitLogger = gitLogger;
             _serversOptions = instancesOptions.Value;
         }
 
@@ -85,7 +87,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                 var instance =
                     new ServerInstance(key, instanceOptions, _configuration, _jenkinsLogger, _serversOptions,
-                        _serverInstanceLogger, _taskQueue, _localLogger);
+                        _serverInstanceLogger, _taskQueue, _localLogger, _gitLogger);
                 _instances.Add(key, instance);
             }
 
