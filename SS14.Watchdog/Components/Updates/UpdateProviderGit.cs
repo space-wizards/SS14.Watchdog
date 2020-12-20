@@ -66,7 +66,7 @@ namespace SS14.Watchdog.Components.Updates
             try
             {
                 if (!Repository.IsValid(_repoPath) || currentVersion == null)
-                    TryClone(cancel);
+                    await TryClone(cancel);
 
                 using var repository = new Repository(_repoPath);
 
@@ -160,7 +160,7 @@ namespace SS14.Watchdog.Components.Updates
 
                 var serverPackage = Path.Combine(_repoPath, "release", $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
 
-                var stream = File.Open(serverPackage, FileMode.Open);
+                await using var stream = File.Open(serverPackage, FileMode.Open);
 
                 // Actually extract.
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
@@ -224,7 +224,7 @@ namespace SS14.Watchdog.Components.Updates
             public string ForkId { get; set; }
         }
         
-        private async void TryClone(CancellationToken cancel = default)
+        private async Task TryClone(CancellationToken cancel = default)
         {
             _logger.LogTrace("Cloning git repository...");
             
