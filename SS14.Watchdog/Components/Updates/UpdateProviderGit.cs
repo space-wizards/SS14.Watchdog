@@ -74,8 +74,8 @@ namespace SS14.Watchdog.Components.Updates
                     null, null);
 
                 _logger.LogTrace("Updating...");
-
-                Commands.Pull(repository, new Signature("Watchdog", "telecommunications@spacestation14.io", DateTimeOffset.Now), null);
+                
+                Commands.Pull(repository, new Signature("Watchdog", "N/A", DateTimeOffset.Now), null);
                 var localBranch = Commands.Checkout(repository, repository.Branches[_branch]);
                 
                 _logger.LogDebug($"Went from {currentVersion} to {localBranch.Tip}");
@@ -160,9 +160,6 @@ namespace SS14.Watchdog.Components.Updates
                 var serverPackage = Path.Combine(_repoPath, "release", $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
 
                 var stream = File.Open(serverPackage, FileMode.Open);
-                
-                // Reset file position so we can extract.
-                stream.Seek(0, SeekOrigin.Begin);
 
                 // Actually extract.
                 using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
