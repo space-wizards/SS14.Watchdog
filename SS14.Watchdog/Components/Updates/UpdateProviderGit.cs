@@ -37,10 +37,10 @@ namespace SS14.Watchdog.Components.Updates
             _configuration = config;
         }
         
-        public override Task<bool> CheckForUpdateAsync(string? currentVersion, CancellationToken cancel = default)
+        public override async Task<bool> CheckForUpdateAsync(string? currentVersion, CancellationToken cancel = default)
         {
             if (!Repository.IsValid(_repoPath) || currentVersion == null)
-                return Task.FromResult(true);
+                return true;
             
 
             var logMessage = "";
@@ -49,7 +49,7 @@ namespace SS14.Watchdog.Components.Updates
             using var repository = new Repository(_repoPath);
             var remote = repository.Network.Remotes["origin"];
             var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
-            Commands.Fetch(repository, remote.Name, refSpecs, null, logMessage);
+            await Task.Run(() => Commands.Fetch(repository, remote.Name, refSpecs, null, logMessage), cancel);
                 
             var localBranch = repository.Branches[_branch];
             var remoteBranch = localBranch.TrackedBranch;
@@ -58,7 +58,7 @@ namespace SS14.Watchdog.Components.Updates
                 update = true;
                 
             _logger.LogInformation(logMessage);
-            return Task.FromResult(update);
+            return update;
         }
 
         public override async Task<string?> RunUpdateAsync(string? currentVersion, string binPath, CancellationToken cancel = default)
@@ -66,17 +66,17 @@ namespace SS14.Watchdog.Components.Updates
             try
             {
                 if (!Repository.IsValid(_repoPath) || currentVersion == null)
-                    TryClone();
+                    TryClone(cancel);
 
                 using var repository = new Repository(_repoPath);
 
                 var remote = repository.Network.Remotes["origin"];
-                Commands.Fetch(repository, remote.Name, remote.FetchRefSpecs.Select(x => x.Specification),
-                    null, null);
+                await Task.Run(() => Commands.Fetch(repository, remote.Name, remote.FetchRefSpecs.Select(x => x.Specification),
+                    null, null), cancel);
 
                 _logger.LogTrace("Updating...");
                 
-                Commands.Pull(repository, new Signature("Watchdog", "N/A", DateTimeOffset.Now), null);
+                await Task.Run(() => Commands.Pull(repository, new Signature("Watchdog", "N/A", DateTimeOffset.Now), null), cancel);
                 var localBranch = Commands.Checkout(repository, repository.Branches[_branch]);
                 
                 _logger.LogDebug($"Went from {currentVersion} to {localBranch.Tip}");
@@ -224,19 +224,19 @@ namespace SS14.Watchdog.Components.Updates
             public string ForkId { get; set; }
         }
         
-        private void TryClone()
+        private async void TryClone(CancellationToken cancel = default)
         {
             _logger.LogTrace("Cloning git repository...");
             
             if(Directory.Exists(_repoPath))
                 Directory.Delete(_repoPath, true);
             
-            Repository.Clone(_baseUrl, _repoPath, new CloneOptions(){RecurseSubmodules = true});
+            await Task.Run(() => Repository.Clone(_baseUrl, _repoPath, new CloneOptions(){RecurseSubmodules = true}), cancel);
             
             using var repository = new Repository(_repoPath);
             var remote = repository.Network.Remotes["origin"];
             var refSpecs = remote.FetchRefSpecs.Select(x => x.Specification);
-            Commands.Fetch(repository, remote.Name, refSpecs, null, null);
+            await Task.Run(() => Commands.Fetch(repository, remote.Name, refSpecs, null, null), cancel);
             var remoteBranch = repository.Branches[$"origin/{_branch}"];
             var localBranch = repository.Branches.Any(x => x.FriendlyName == _branch) 
                 ? repository.Branches[_branch] : repository.CreateBranch(_branch);
