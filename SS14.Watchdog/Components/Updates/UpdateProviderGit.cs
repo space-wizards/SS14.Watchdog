@@ -88,11 +88,15 @@ namespace SS14.Watchdog.Components.Updates
                 }
 
                 using var engineRepository = new Repository(Path.Combine(_repoPath, "RobustToolbox"));
-
+                
                 var engineVersion = engineRepository.Describe(engineRepository.Branches["master"].Tip, 
                                         new DescribeOptions(){MinimumCommitIdAbbreviatedSize = 0, Strategy = DescribeStrategy.Tags})?.Trim()
                                     ?? throw new NullReferenceException("Can't find version for engine submodule.");
 
+                // Fetch engine tags.
+                Commands.Fetch(engineRepository, "origin", remote.FetchRefSpecs.Select(x => x.Specification),
+                    new FetchOptions(){TagFetchMode = TagFetchMode.All}, null);
+                
                 if (!engineVersion.StartsWith('v'))
                     throw new InvalidDataException($"Engine submodule tag \"{engineVersion}\" doesn't start with v!");
 
