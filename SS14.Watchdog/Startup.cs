@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Serilog;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Configuration;
@@ -46,6 +47,8 @@ namespace SS14.Watchdog
             {
                 app.UseDeveloperExceptionPage();
             }
+
+            app.UseSerilogRequestLogging();
 
             // app.UseHttpsRedirection();
 
