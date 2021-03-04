@@ -1,15 +1,11 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.IO.Compression;
 using System.Net.Http;
-using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using JetBrains.Annotations;
 using Microsoft.Extensions.Logging;
-using Mono.Unix;
 using SS14.Watchdog.Configuration.Updates;
 using SS14.Watchdog.Utility;
 
@@ -110,24 +106,7 @@ namespace SS14.Watchdog.Components.Updates
                 // Reset file position so we can extract.
                 tempFile.Seek(0, SeekOrigin.Begin);
 
-                // Actually extract.
-                using var archive = new ZipArchive(tempFile, ZipArchiveMode.Read);
-                archive.ExtractToDirectory(binPath);
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
-                    RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    // chmod +x Robust.Server
-
-                    var rsPath = Path.Combine(binPath, "Robust.Server");
-                    if (File.Exists(rsPath))
-                    {
-                        var f = new UnixFileInfo(rsPath);
-                        f.FileAccessPermissions |=
-                            FileAccessPermissions.UserExecute | FileAccessPermissions.GroupExecute |
-                            FileAccessPermissions.OtherExecute;
-                    }
-                }
+                DoBuildExtract(tempFile, binPath);
 
                 return buildRef.Number.ToString(CultureInfo.InvariantCulture);
             }

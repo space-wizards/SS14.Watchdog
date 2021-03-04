@@ -9,6 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.Updates;
@@ -63,10 +64,14 @@ namespace SS14.Watchdog.Components.ServerManagement
         private DateTime? _lastPing;
         private CancellationTokenSource? _serverTimeoutTcs;
 
-        public ServerInstance(string key, InstanceConfiguration instanceConfig, IConfiguration configuration,
-            ILogger<UpdateProviderJenkins> jenkinsLogger, ServersConfiguration serversConfiguration,
-            ILogger<ServerInstance> logger, IBackgroundTaskQueue taskQueue, ILogger<UpdateProviderLocal> localLogger,
-            ILogger<UpdateProviderGit> gitLogger)
+        public ServerInstance(
+            string key,
+            InstanceConfiguration instanceConfig,
+            IConfiguration configuration, 
+            ServersConfiguration serversConfiguration,
+            ILogger<ServerInstance> logger,
+            IBackgroundTaskQueue taskQueue,
+            IServiceProvider serviceProvider)
         {
             Key = key;
             _instanceConfig = instanceConfig;
@@ -82,7 +87,9 @@ namespace SS14.Watchdog.Components.ServerManagement
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderJenkinsConfiguration>();
 
-                    _updateProvider = new UpdateProviderJenkins(jenkinsConfig, jenkinsLogger);
+                    _updateProvider = new UpdateProviderJenkins(
+                        jenkinsConfig, 
+                        serviceProvider.GetRequiredService<ILogger<UpdateProviderJenkins>>());
                     break;
 
                 case "Local":
@@ -90,7 +97,11 @@ namespace SS14.Watchdog.Components.ServerManagement
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderLocalConfiguration>();
 
-                    _updateProvider = new UpdateProviderLocal(this, localConfig, localLogger, configuration);
+                    _updateProvider = new UpdateProviderLocal(
+                        this,
+                        localConfig, 
+                        serviceProvider.GetRequiredService<ILogger<UpdateProviderLocal>>(),
+                        configuration);
                     break;
                 
                 case "Git":
@@ -98,9 +109,23 @@ namespace SS14.Watchdog.Components.ServerManagement
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderGitConfiguration>();
 
-                    _updateProvider = new UpdateProviderGit(this, gitConfig, gitLogger, configuration);
+                    _updateProvider = new UpdateProviderGit(
+                        this,
+                        gitConfig,
+                        serviceProvider.GetRequiredService<ILogger<UpdateProviderGit>>(),
+                        configuration);
                     break;
                 
+                case "Manifest":
+                    var manifestConfig = configuration
+                        .GetSection($"Servers:Instances:{key}:Updates")
+                        .Get<UpdateProviderManifestConfiguration>();
+
+                    _updateProvider = new UpdateProviderManifest(
+                        manifestConfig,
+                        serviceProvider.GetRequiredService<ILogger<UpdateProviderManifest>>());
+                    break;
+
                 case "Dummy":
                     _updateProvider = new UpdateProviderDummy();
                     break;
@@ -116,7 +141,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             if (!Directory.Exists(InstanceDir))
             {
                 Directory.CreateDirectory(InstanceDir);
-                _logger.LogInformation($"Created InstanceDir {InstanceDir}");
+                _logger.LogInformation("Created InstanceDir {InstanceDir}", InstanceDir);
             }
 
             LoadData();
@@ -197,16 +222,20 @@ namespace SS14.Watchdog.Components.ServerManagement
                         var newRevision = await _updateProvider.RunUpdateAsync(
                             _currentRevision,
                             Path.Combine(InstanceDir, "bin"));
-
-                        _logger.LogDebug("Updated from {current} to {new}.",
-                            _currentRevision ?? "<none>",
-                            newRevision);
-
+                        
                         if (newRevision != null)
                         {
+                            _logger.LogDebug("Updated from {current} to {new}.",
+                                _currentRevision ?? "<none>",
+                                newRevision);
+
                             _loadFailCount = 0;
                             _currentRevision = newRevision;
                             SaveData();
+                        }
+                        else
+                        {
+                            _logger.LogError("Failed to update!");
                         }
                     }
                 }

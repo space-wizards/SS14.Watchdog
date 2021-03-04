@@ -3,7 +3,7 @@ Serilog:
   MinimumLevel: 
     Default: Information
     Override:
-      SS14: Trace
+      SS14: Verbose
       Microsoft: Warning
       Microsoft.Hosting.Lifetime: "Information"
       
@@ -37,7 +37,10 @@ Servers:
       #  BaseUrl: "https://github.com/space-wizards/space-station-14.git"
       #  Branch: "master"
 
-      UpdateType: "Jenkins"
+      #UpdateType: "Jenkins"
+      #Updates:
+      #  BaseUrl: "https://builds.spacestation14.io/jenkins"
+      #  JobName: "SS14 Content"
+      UpdateType: "Manifest"
       Updates:
-        BaseUrl: "https://builds.spacestation14.io/jenkins"
-        JobName: "SS14 Content"
+        ManifestUrl: "http://127.0.0.1:8000/manifest.json"

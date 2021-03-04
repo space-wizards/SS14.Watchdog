@@ -7,11 +7,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SS14.Watchdog.Components.BackgroundTasks;
-using SS14.Watchdog.Components.Updates;
 using SS14.Watchdog.Configuration;
 
 namespace SS14.Watchdog.Components.ServerManagement
@@ -20,11 +20,8 @@ namespace SS14.Watchdog.Components.ServerManagement
     public sealed class ServerManager : BackgroundService, IServerManager
     {
         private readonly ILogger<ServerManager> _logger;
-        private readonly ILogger<UpdateProviderJenkins> _jenkinsLogger;
-        private readonly ILogger<UpdateProviderLocal> _localLogger;
-        private readonly ILogger<UpdateProviderGit> _gitLogger;
-        private readonly ILogger<ServerInstance> _serverInstanceLogger;
         private readonly IBackgroundTaskQueue _taskQueue;
+        private readonly IServiceProvider _provider;
         private readonly IConfiguration _configuration;
         private readonly ServersConfiguration _serversOptions;
         private readonly Dictionary<string, ServerInstance> _instances = new Dictionary<string, ServerInstance>();
@@ -33,17 +30,15 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public ServerManager(
             IOptions<ServersConfiguration> instancesOptions,
-            ILogger<ServerManager> logger, IConfiguration configuration, ILogger<UpdateProviderJenkins> jenkinsLogger,
-            ILogger<ServerInstance> serverInstanceLogger, IBackgroundTaskQueue taskQueue,
-            ILogger<UpdateProviderLocal> localLogger, ILogger<UpdateProviderGit> gitLogger)
+            ILogger<ServerManager> logger,
+            IConfiguration configuration,
+            IBackgroundTaskQueue taskQueue,
+            IServiceProvider provider)
         {
             _logger = logger;
             _configuration = configuration;
-            _jenkinsLogger = jenkinsLogger;
-            _serverInstanceLogger = serverInstanceLogger;
             _taskQueue = taskQueue;
-            _localLogger = localLogger;
-            _gitLogger = gitLogger;
+            _provider = provider;
             _serversOptions = instancesOptions.Value;
         }
 
@@ -77,7 +72,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             if (!Directory.Exists(instanceRoot))
             {
                 Directory.CreateDirectory(instanceRoot);
-                _logger.LogInformation($"Created InstanceRoot {instanceRoot}");
+                _logger.LogInformation("Created InstanceRoot {InstanceRoot}", instanceRoot);
             }
             
             // Init server instances.
@@ -86,8 +81,15 @@ namespace SS14.Watchdog.Components.ServerManagement
                 _logger.LogDebug("Initializing instance {Name} ({Key})", instanceOptions.Name, key);
 
                 var instance =
-                    new ServerInstance(key, instanceOptions, _configuration, _jenkinsLogger, _serversOptions,
-                        _serverInstanceLogger, _taskQueue, _localLogger, _gitLogger);
+                    new ServerInstance(
+                        key, 
+                        instanceOptions,
+                        _configuration,
+                        _serversOptions,
+                        _provider.GetRequiredService<ILogger<ServerInstance>>(),
+                        _taskQueue,
+                        _provider);
+                
                 _instances.Add(key, instance);
             }
 

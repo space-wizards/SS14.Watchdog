@@ -2,12 +2,13 @@ using System;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
-using System.Text;
 using System.Collections.Generic;
+using System.IO.Compression;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
+using Mono.Unix;
 
 namespace SS14.Watchdog.Components.Updates
 {
@@ -93,20 +94,28 @@ namespace SS14.Watchdog.Components.Updates
             using var file = File.OpenRead(filePath);
             using var sha = SHA256.Create();
 
-            return ByteArrayToString(sha.ComputeHash(file));
+            return Convert.ToHexString(sha.ComputeHash(file));
         }
 
-        [Pure]
-        // https://stackoverflow.com/a/311179/4678631
-        private static string ByteArrayToString(byte[] ba)
+        protected static void DoBuildExtract(Stream stream, string binPath)
         {
-            var hex = new StringBuilder(ba.Length * 2);
-            foreach (var b in ba)
-            {
-                hex.AppendFormat("{0:x2}", b);
-            }
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+            archive.ExtractToDirectory(binPath);
 
-            return hex.ToString();
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ||
+                RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                // chmod +x Robust.Server
+
+                var rsPath = Path.Combine(binPath, "Robust.Server");
+                if (File.Exists(rsPath))
+                {
+                    var f = new UnixFileInfo(rsPath);
+                    f.FileAccessPermissions |=
+                        FileAccessPermissions.UserExecute | FileAccessPermissions.GroupExecute |
+                        FileAccessPermissions.OtherExecute;
+                }
+            }
         }
     }
 }
