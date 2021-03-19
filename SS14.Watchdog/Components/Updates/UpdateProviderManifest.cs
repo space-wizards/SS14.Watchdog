@@ -17,6 +17,8 @@ namespace SS14.Watchdog.Components.Updates
 {
     public sealed class UpdateProviderManifest : UpdateProvider
     {
+        private const int DownloadTimeoutSeconds = 30;
+        
         private readonly HttpClient _httpClient = new();
 
         private readonly string _manifestUrl;
@@ -111,8 +113,21 @@ namespace SS14.Watchdog.Components.Updates
             _logger.LogTrace("Downloading server binary from {Download} to {TempFile}", downloadUrl, tempFile.Name);
 
             // Download to file...
-            var resp = await _httpClient.GetAsync(downloadUrl, cancel);
-            await resp.Content.CopyToAsync(tempFile, cancel);
+            var timeout = Task.Delay(TimeSpan.FromSeconds(DownloadTimeoutSeconds), cancel);
+            var downloadTask = Task.Run(async () =>
+            {
+                var resp = await _httpClient.GetAsync(downloadUrl, cancel);
+                await resp.Content.CopyToAsync(tempFile, cancel);
+            }, cancel);
+
+            if (await Task.WhenAny(downloadTask, timeout) == timeout)
+            {
+                await timeout; // Throws cancellation if cancellation requested.
+                _logger.LogError("Timeout while downloading: {Timeout} seconds", DownloadTimeoutSeconds);
+                return null;
+            }
+
+            await downloadTask;
 
             // Verify hash because why not?
             using var hash = SHA256.Create();
