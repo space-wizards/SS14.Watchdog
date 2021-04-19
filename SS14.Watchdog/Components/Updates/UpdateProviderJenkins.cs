@@ -83,7 +83,7 @@ namespace SS14.Watchdog.Components.Updates
                 var downloadRootUri = new Uri($"{_baseUrl}/job/{_jobName}/{buildRef.Number}/artifact/release/");
 
                 // Create temporary file to download binary into (not doing this in memory).
-                await using var tempFile = File.Open(Path.GetTempFileName(), FileMode.Open, FileAccess.ReadWrite);
+                await using var tempFile = TempFile.CreateTempFile();
                 // Download URI for server binary.
                 var serverDownload = new Uri(downloadRootUri, $"SS14.Server_{GetHostPlatformName()}_{GetHostArchitectureName()}.zip");
 

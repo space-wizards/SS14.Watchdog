@@ -108,7 +108,7 @@ namespace SS14.Watchdog.Components.Updates
             var downloadHash = Convert.FromHexString(build.Sha256);
             
             // Create temporary file to download binary into (not doing this in memory).
-            await using var tempFile = File.Open(Path.GetTempFileName(), FileMode.Open, FileAccess.ReadWrite);
+            await using var tempFile = TempFile.CreateTempFile();
 
             _logger.LogTrace("Downloading server binary from {Download} to {TempFile}", downloadUrl, tempFile.Name);
 
