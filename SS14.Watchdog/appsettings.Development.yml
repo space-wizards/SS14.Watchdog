@@ -43,4 +43,4 @@ Servers:
       #  JobName: "SS14 Content"
       UpdateType: "Manifest"
       Updates:
-        ManifestUrl: "http://127.0.0.1:8000/manifest.json"
+        ManifestUrl: "https://central.spacestation14.io/builds/wizards/manifest.json"
