@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using JetBrains.Annotations;
+using Microsoft.Diagnostics.NETCore.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -28,17 +29,17 @@ namespace SS14.Watchdog.Components.ServerManagement
         /// </remarks>
         private const int LoadFailMax = 3;
 
-        /// <summary>
-        ///     How long since the last ping before we consider the server "dead" and forcefully terminate it.
-        /// </summary>
-        private static readonly TimeSpan PingTimeoutDelay = TimeSpan.FromSeconds(60);
-
         public string Key { get; }
         public string? Secret { get; private set; }
         public string? ApiToken => _instanceConfig.ApiToken;
 
         public bool IsRunning => _runningServerProcess != null;
 
+        /// <summary>
+        ///     How long since the last ping before we consider the server "dead" and forcefully terminate it.
+        /// </summary>
+        private TimeSpan PingTimeoutDelay => TimeSpan.FromSeconds(_instanceConfig.TimeoutSeconds);
+        
         private readonly SemaphoreSlim _stateLock = new SemaphoreSlim(1, 1);
 
         private readonly HttpClient _serverHttpClient = new HttpClient();
@@ -264,6 +265,11 @@ namespace SS14.Watchdog.Components.ServerManagement
                 }
             };
 
+            foreach (var (envVar, value) in _instanceConfig.EnvironmentVariables)
+            {
+                startInfo.Environment[envVar] = value;
+            }
+
             // Add current build information.
             if (_currentRevision != null && _updateProvider != null)
             {
@@ -436,13 +442,53 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             try
             {
-                _logger.LogWarning("{key} timed out, killing.", Key);
-                _runningServerProcess?.Kill();
+                TimeoutKill();
             }
             finally
             {
                 _stateLock.Release();
             }
+        }
+
+        private void TimeoutKill()
+        {
+            _logger.LogWarning("{Key}: timed out, killing", Key);
+
+            if (_runningServerProcess == null)
+                return;
+            
+            if (_instanceConfig.DumpOnTimeout)
+            {
+                if (!OperatingSystem.IsWindows())
+                {
+                    _logger.LogInformation("{Key}: making on-kill process dump of type {DumpType}", 
+                    Key, _instanceConfig.TimeoutDumpType);
+
+                    try
+                    {
+                        var dumpDir = Path.Combine(InstanceDir, "dumps");
+                        Directory.CreateDirectory(dumpDir);
+                        var dumpFile = Path.Combine(dumpDir, $"dump_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}");
+                        
+                        var client = new DiagnosticsClient(_runningServerProcess.Id);
+                        client.WriteDump(_instanceConfig.TimeoutDumpType, dumpFile);
+
+                        _logger.LogInformation("{Key}: Process dump written to {DumpFilePath}", Key, dumpFile);
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogError(e, "{Key}: exception while making process dump", Key);
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("{Key}: not creating process dump: not supported on Windows", Key);
+                }
+
+                _logger.LogInformation("{Key}: killing process...", Key);
+            }
+            
+            _runningServerProcess.Kill();
         }
 
         public void HandleUpdateCheck()
