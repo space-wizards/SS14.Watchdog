@@ -140,7 +140,7 @@ namespace SS14.Watchdog.Components.Updates
                 // The --depth=1 is a performance cheat. Works though.
                 await CommandHelperChecked("Failed initial clone!", null, "git", new string[] {"clone", "--depth=1", _baseUrl, _repoPath}, cancel);
                 await CommandHelperChecked("Failed branch checkout!", _repoPath, "git", new string[] {"checkout", _branch}, cancel);
-                await CommandHelperChecked("Failed submodule update!", _repoPath, "git", new string[] {"submodule", "update", "--init", "--depth=1", "--recursive"}, cancel);
+                await GitCheckedSubmoduleUpdate(cancel);
             }
             catch (Exception)
             {
