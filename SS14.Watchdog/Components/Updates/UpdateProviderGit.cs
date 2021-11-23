@@ -35,7 +35,7 @@ namespace SS14.Watchdog.Components.Updates
             _configuration = config;
         }
 
-        private async Task<int> CommandHelper(string? cd, string command, string[] args, CancellationToken cancel = default)
+        private async Task<int> CommandHelper(string cd, string command, string[] args, CancellationToken cancel = default)
         {
             var si = new ProcessStartInfo {
                 FileName = command, CreateNoWindow = true, UseShellExecute = true,
@@ -138,7 +138,7 @@ namespace SS14.Watchdog.Components.Updates
                 // NOTE: These are expected to prepare everything including submodules,
                 // because this is used for orbital nuking in the event of an update issue.
                 // The --depth=1 is a performance cheat. Works though.
-                await CommandHelperChecked("Failed initial clone!", null, "git", new string[] {"clone", "--depth=1", _baseUrl, _repoPath}, cancel);
+                await CommandHelperChecked("Failed initial clone!", "", "git", new string[] {"clone", "--depth=1", _baseUrl, _repoPath}, cancel);
                 await CommandHelperChecked("Failed branch checkout!", _repoPath, "git", new string[] {"checkout", _branch}, cancel);
                 await GitCheckedSubmoduleUpdate(cancel);
             }
@@ -232,7 +232,6 @@ namespace SS14.Watchdog.Components.Updates
                 // Now we build and package it.
 
                 // Platform to build the server for.
-                var serverPlatform = RuntimeInformation.RuntimeIdentifier;
 
                 var binariesPath = Path.Combine(_serverInstance.InstanceDir, "binaries");
                 
@@ -248,7 +247,7 @@ namespace SS14.Watchdog.Components.Updates
                 
                 _logger.LogTrace("Building server packages...");
                 
-                await CommandHelperChecked("Failed to build server packages", _repoPath, "python", new string[] {"Tools/package_server_build.py", "-p", serverPlatform}, cancel);
+                await CommandHelperChecked("Failed to build server packages", _repoPath, "python", new string[] {"Tools/package_server_build.py", "-p", GetHostSS14RID()}, cancel);
 
                 _logger.LogTrace("Applying server update.");
                 
@@ -261,7 +260,7 @@ namespace SS14.Watchdog.Components.Updates
 
                 _logger.LogTrace("Extracting zip file");
 
-                var serverPackage = Path.Combine(_repoPath, "release", $"SS14.Server_{serverPlatform}.zip");
+                var serverPackage = Path.Combine(_repoPath, "release", ServerZipName);
 
                 await using var stream = File.Open(serverPackage, FileMode.Open);
 
