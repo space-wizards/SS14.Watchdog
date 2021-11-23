@@ -21,6 +21,7 @@ namespace SS14.Watchdog.Components.Updates
         private readonly ServerInstance _serverInstance;
         private readonly string _baseUrl;
         private readonly string _branch;
+        private readonly bool _hybridACZ;
         private readonly ILogger<UpdateProviderGit> _logger;
         private readonly string _repoPath;
         private readonly IConfiguration _configuration;
@@ -30,6 +31,7 @@ namespace SS14.Watchdog.Components.Updates
             _serverInstance = serverInstanceInstance;
             _baseUrl = configuration.BaseUrl;
             _branch = configuration.Branch;
+            _hybridACZ = configuration.HybridACZ;
             _logger = logger;
             _repoPath = Path.Combine(_serverInstance.InstanceDir, "source");
             _configuration = config;
@@ -233,21 +235,53 @@ namespace SS14.Watchdog.Components.Updates
 
                 // Platform to build the server for.
 
-                var binariesPath = Path.Combine(_serverInstance.InstanceDir, "binaries");
-                
-                // If you get an error here: You need a BaseUrl in the root of appsettings.yml that represents the public URL of the watchdog server.
-                var binariesRoot = new Uri(new Uri(_configuration["BaseUrl"]),
-                    $"instances/{_serverInstance.Key}/binaries/");
-                
-                _logger.LogTrace("Building client packages...");
-                
-                await CommandHelperChecked("Failed to build client packages", _repoPath, "python", new string[] {"Tools/package_client_build.py"}, cancel);
-                
-                File.Move(Path.Combine(_repoPath, "release", ClientZipName), Path.Combine(binariesPath, ClientZipName), true);
-                
-                _logger.LogTrace("Building server packages...");
-                
-                await CommandHelperChecked("Failed to build server packages", _repoPath, "python", new string[] {"Tools/package_server_build.py", "-p", GetHostSS14RID()}, cancel);
+                // Where the server zip will be created by the server build script.
+                var serverPackage = Path.Combine(_repoPath, "release", ServerZipName);
+                var serverPlatform = GetHostSS14RID();
+
+                if (_hybridACZ)
+                {
+                    await CommandHelperChecked("Failed to build Hybrid ACZ package", _repoPath, "python", new string[] {"Tools/package_server_build.py", "--hybrid-acz", "-p", serverPlatform}, cancel);
+                }
+                else
+                {
+                    var binariesPath = Path.Combine(_serverInstance.InstanceDir, "binaries");
+
+                    // If you get an error here: You need a BaseUrl in the root of appsettings.yml that represents the public URL of the watchdog server.
+                    var binariesRoot = new Uri(new Uri(_configuration["BaseUrl"]),
+                        $"instances/{_serverInstance.Key}/binaries/");
+
+                    _logger.LogTrace("Building client packages...");
+
+                    await CommandHelperChecked("Failed to build client packages", _repoPath, "python", new string[] {"Tools/package_client_build.py"}, cancel);
+
+                    File.Move(Path.Combine(_repoPath, "release", ClientZipName), Path.Combine(binariesPath, ClientZipName), true);
+
+                    _logger.LogTrace("Building server packages...");
+                    await CommandHelperChecked("Failed to build server packages", _repoPath, "python", new string[] {"Tools/package_server_build.py", "-p", serverPlatform}, cancel);
+
+                    // Unless using Hybrid ACZ, a build.json file must be written.
+                    await using (var stream = File.Open(serverPackage, FileMode.Open))
+                    {
+                        using (var archive = new ZipArchive(stream, ZipArchiveMode.Update))
+                        {
+                            var build = new Build()
+                            {
+                                Download = new Uri(binariesRoot, ClientZipName).ToString(),
+                                Hash = GetFileHash(Path.Combine(binariesPath, ClientZipName)),
+                                Version = actualConfirmedHead,
+                                // Use ACZ version auto-detection.
+                                EngineVersion = "",
+                                ForkId = _baseUrl,
+                            };
+                            ZipArchiveEntry readmeEntry = archive.CreateEntry("build.json");
+                            await using (StreamWriter writer = new StreamWriter(readmeEntry.Open()))
+                            {
+                                await writer.WriteLineAsync(JsonSerializer.Serialize(build));
+                            }
+                        }
+                    }
+                }
 
                 _logger.LogTrace("Applying server update.");
                 
@@ -260,14 +294,15 @@ namespace SS14.Watchdog.Components.Updates
 
                 _logger.LogTrace("Extracting zip file");
 
-                var serverPackage = Path.Combine(_repoPath, "release", ServerZipName);
-
-                await using var stream = File.Open(serverPackage, FileMode.Open);
-
                 // Actually extract.
-                using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-                archive.ExtractToDirectory(binPath);
-                
+                await using (var stream = File.Open(serverPackage, FileMode.Open))
+                {
+                    using (var archive = new ZipArchive(stream, ZipArchiveMode.Read))
+                    {
+                        archive.ExtractToDirectory(binPath);
+                    }
+                }
+
                 // Remove the package now that it's extracted.
                 File.Delete(serverPackage);
 
@@ -285,18 +320,6 @@ namespace SS14.Watchdog.Components.Updates
                             FileAccessPermissions.OtherExecute;
                     }
                 }
-
-                var build = new Build()
-                {
-                    Download = new Uri(binariesRoot, ClientZipName).ToString(),
-                    Hash = GetFileHash(Path.Combine(binariesPath, ClientZipName)),
-                    Version = actualConfirmedHead,
-                    // Use ACZ version auto-detection.
-                    EngineVersion = "",
-                    ForkId = _baseUrl,
-                };
-
-                await File.WriteAllTextAsync(Path.Combine(binPath, "build.json"), JsonSerializer.Serialize(build), cancel);
                 
                 // ReSharper disable once RedundantTypeArgumentsOfMethod
                 return actualConfirmedHead;
