@@ -51,7 +51,7 @@ namespace SS14.Watchdog
 
             app.UseSerilogRequestLogging();
 
-            Log.ForContext<Startup>().Information($"Using server GC: {GCSettings.IsServerGC}");
+            Log.ForContext<Startup>().Debug($"Using server GC: {GCSettings.IsServerGC}");
 
             // app.UseHttpsRedirection();
 
