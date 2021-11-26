@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime;
 using JetBrains.Annotations;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -49,6 +50,8 @@ namespace SS14.Watchdog
             }
 
             app.UseSerilogRequestLogging();
+
+            Log.ForContext<Startup>().Debug($"Using server GC: {GCSettings.IsServerGC}");
 
             // app.UseHttpsRedirection();
 
