@@ -18,10 +18,7 @@ namespace SS14.Watchdog.Components.Updates
     public abstract class UpdateProvider
     {
         protected const string ClientZipName = "SS14.Client.zip";
-
-        protected const string PlatformNameWindows = "Windows";
-        protected const string PlatformNameLinux = "Linux";
-        protected const string PlatformNameMacOS = "macOS";
+        protected string ServerZipName => $"SS14.Server_{GetHostSS14RID()}.zip";
 
         /// <summary>
         ///     Check whether an update is available.
@@ -47,42 +44,51 @@ namespace SS14.Watchdog.Components.Updates
         }
 
         [Pure]
-        protected static string GetHostPlatformName()
+        protected static string GetHostSS14RID()
+        {
+            return GetHostPlatformName() + "-" + GetHostArchitectureName();
+        }
+
+        [Pure]
+        private static string GetHostPlatformName()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                return PlatformNameWindows;
+                return "win";
             }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                return PlatformNameLinux;
+                return "linux";
             }
 
             if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                return PlatformNameMacOS;
+                return "osx";
             }
 
             throw new PlatformNotSupportedException();
         }
 
         [Pure]
-        protected static string GetHostArchitectureName()
+        private static string GetHostArchitectureName()
         {
             switch (RuntimeInformation.OSArchitecture)
             {
+                case Architecture.X86:
+                    return "x86";
+
                 case Architecture.X64:
                     return "x64";
 
-                case Architecture.Arm64:
-                    // Only Linux is supported on ARM64.
-                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                        throw new PlatformNotSupportedException();
-                    
-                    return "ARM64";
+                case Architecture.Arm:
+                    return "arm";
 
-                // Any other architecture is unsupported.
+                case Architecture.Arm64:
+                    return "arm64";
+
+                // Other architectures not supported.
+                // Even some of these aren't but there's no reason not to force it to fail here.
                 default:
                     throw new PlatformNotSupportedException();
             }
