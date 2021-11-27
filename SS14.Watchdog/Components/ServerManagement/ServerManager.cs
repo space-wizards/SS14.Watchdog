@@ -23,13 +23,13 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly IBackgroundTaskQueue _taskQueue;
         private readonly IServiceProvider _provider;
         private readonly IConfiguration _configuration;
-        private readonly ServersConfiguration _serversOptions;
+        private readonly IOptionsMonitor<ServersConfiguration> _serverCfg; 
         private readonly Dictionary<string, ServerInstance> _instances = new Dictionary<string, ServerInstance>();
 
         public IReadOnlyCollection<IServerInstance> Instances => _instances.Values;
 
         public ServerManager(
-            IOptions<ServersConfiguration> instancesOptions,
+            IOptionsMonitor<ServersConfiguration> instancesOptions,
             ILogger<ServerManager> logger,
             IConfiguration configuration,
             IBackgroundTaskQueue taskQueue,
@@ -39,7 +39,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             _configuration = configuration;
             _taskQueue = taskQueue;
             _provider = provider;
-            _serversOptions = instancesOptions.Value;
+            _serverCfg = instancesOptions;
         }
 
         public bool TryGetInstance(string key, [NotNullWhen(true)] out IServerInstance? instance)
@@ -67,7 +67,10 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
-            var instanceRoot = Path.Combine(Environment.CurrentDirectory, _serversOptions.InstanceRoot);
+            _serverCfg.OnChange(CfgChanged);
+            
+            var options = _serverCfg.CurrentValue;
+            var instanceRoot = Path.Combine(Environment.CurrentDirectory, options.InstanceRoot);
             
             if (!Directory.Exists(instanceRoot))
             {
@@ -76,7 +79,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             }
             
             // Init server instances.
-            foreach (var (key, instanceOptions) in _serversOptions.Instances)
+            foreach (var (key, instanceOptions) in options.Instances)
             {
                 _logger.LogDebug("Initializing instance {Name} ({Key})", instanceOptions.Name, key);
 
@@ -85,7 +88,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                         key, 
                         instanceOptions,
                         _configuration,
-                        _serversOptions,
+                        options,
                         _provider.GetRequiredService<ILogger<ServerInstance>>(),
                         _taskQueue,
                         _provider);
@@ -95,6 +98,17 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             // This calls ExecuteAsync
             await base.StartAsync(cancellationToken);
+        }
+
+        private void CfgChanged(ServersConfiguration obj)
+        {
+            foreach (var (k, instance) in _instances)
+            {
+                if (!obj.Instances.TryGetValue(k, out var instanceCfg))
+                    return;
+                
+                instance.OnConfigUpdate(instanceCfg);
+            }
         }
 
         public override async Task StopAsync(CancellationToken cancellationToken)

@@ -21,8 +21,8 @@ namespace SS14.Watchdog
                 .ConfigureAppConfiguration((context, builder)=>
                 {
                     var env = context.HostingEnvironment;
-                    builder.AddYamlFile("appsettings.yml", false);
-                    builder.AddYamlFile($"appsettings.{env.EnvironmentName}.yml", true);
+                    builder.AddYamlFile("appsettings.yml", false, reloadOnChange: true);
+                    builder.AddYamlFile($"appsettings.{env.EnvironmentName}.yml", true, reloadOnChange: true);
                 })
                 .UseSerilog((ctx, cfg) =>
                 {

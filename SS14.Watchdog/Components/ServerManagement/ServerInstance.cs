@@ -44,7 +44,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         private readonly HttpClient _serverHttpClient = new HttpClient();
 
-        private readonly InstanceConfiguration _instanceConfig;
+        private InstanceConfiguration _instanceConfig;
         private readonly IConfiguration _configuration;
         private readonly UpdateProvider? _updateProvider;
         private readonly ServersConfiguration _serversConfiguration;
@@ -148,6 +148,11 @@ namespace SS14.Watchdog.Components.ServerManagement
             LoadData();
         }
 
+        public void OnConfigUpdate(InstanceConfiguration cfg)
+        {
+            _instanceConfig = cfg;
+        }
+        
         private void LoadData()
         {
             var dataPath = Path.Combine(InstanceDir, "data.json");
