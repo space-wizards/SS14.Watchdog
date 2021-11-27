@@ -23,7 +23,7 @@
       <None Update="appsettings.yml">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
-        <None Remove="Utility\runtime.json" />
+        <Content Remove="Utility\runtime.json" />
         <EmbeddedResource Include="Utility\runtime.json">
             <LogicalName>Utility.runtime.json</LogicalName>
         </EmbeddedResource>
