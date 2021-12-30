@@ -110,7 +110,7 @@ namespace SS14.Watchdog.Components.Updates
         {
             try
             {
-                return await CommandHelper(_repoPath, "git", new string[] {"status"}) == 0;
+                return await CommandHelper(_repoPath, "git", new[] {"status"}) == 0;
             }
             catch (Exception)
             {
@@ -118,16 +118,27 @@ namespace SS14.Watchdog.Components.Updates
             }
         }
 
-        private async Task<bool> GitFetchOrigin()
+        private async Task<bool> GitFetchOrigin(CancellationToken cancel = default)
         {
-            return await CommandHelper(_repoPath, "git", new string[] {"fetch", _baseUrl, _branch}) == 0;
+            return await CommandHelper(_repoPath, "git", new[] {"fetch", _baseUrl, _branch}, cancel) == 0;
+        }
+
+        private async Task GitSwitchBranch(CancellationToken cancel = default)
+        {
+            await CommandHelperChecked($"Failed to switch to branch {_branch}!", _repoPath, "git",
+                new[]{"switch", _branch}, cancel);
         }
 
         private async Task GitCheckedSubmoduleUpdate(CancellationToken cancel = default)
         {
-            await CommandHelperChecked("Failed submodule update!", _repoPath, "git", new string[] {"submodule", "update", "--init", "--depth=1", "--recursive"}, cancel);
+            await CommandHelperChecked("Failed submodule update!", _repoPath, "git", new[] {"submodule", "update", "--init", "--depth=1", "--recursive"}, cancel);
         }
-        
+
+        private async Task GitResetToFetchHead(CancellationToken cancel = default)
+        {
+            await CommandHelperChecked("Failed reset to fetch-head", _repoPath, "git", new[] {"reset", "--hard", "FETCH_HEAD"}, cancel);
+        }
+
         private async Task TryClone(CancellationToken cancel = default)
         {
             _logger.LogTrace("Cloning git repository...");
@@ -140,8 +151,9 @@ namespace SS14.Watchdog.Components.Updates
                 // NOTE: These are expected to prepare everything including submodules,
                 // because this is used for orbital nuking in the event of an update issue.
                 // The --depth=1 is a performance cheat. Works though.
-                await CommandHelperChecked("Failed initial clone!", "", "git", new string[] {"clone", "--depth=1", _baseUrl, _repoPath}, cancel);
-                await CommandHelperChecked("Failed branch checkout!", _repoPath, "git", new string[] {"checkout", _branch}, cancel);
+                await CommandHelperChecked("Failed initial clone!", "", "git", new[] {"clone", "--depth=1", _baseUrl, _repoPath}, cancel);
+                await GitFetchOrigin(cancel);
+                await GitResetToFetchHead(cancel);
                 await GitCheckedSubmoduleUpdate(cancel);
             }
             catch (Exception)
@@ -156,7 +168,7 @@ namespace SS14.Watchdog.Components.Updates
         {
             try
             {
-                return (await CommandHelperCheckedStdout("", _repoPath, "git", new string[] {"rev-parse", head})).Trim();
+                return (await CommandHelperCheckedStdout("", _repoPath, "git", new[] {"rev-parse", head})).Trim();
             }
             catch (Exception)
             {
@@ -173,7 +185,7 @@ namespace SS14.Watchdog.Components.Updates
 
             var update = false;
 
-            if (!await GitFetchOrigin())
+            if (!await GitFetchOrigin(cancel))
             {
                 // Maybe the server's not up right now.
                 return false;
@@ -195,7 +207,7 @@ namespace SS14.Watchdog.Components.Updates
             try
             {
                 var isFresh = false;
-                if ((!(await GitCheckRepositoryValid())) || currentVersion == null)
+                if (!await GitCheckRepositoryValid() || currentVersion == null)
                 {
                     await TryClone(cancel);
                     isFresh = true;
@@ -212,10 +224,10 @@ namespace SS14.Watchdog.Components.Updates
                     try
                     {
                         // Don't allow these to be cancelled as they could probably corrupt the repository.
-                        if (!(await GitFetchOrigin()))
+                        if (!(await GitFetchOrigin(cancel)))
                             throw new Exception("Could not fetch origin");
-                        await CommandHelperChecked("Failed reset to fetch-head", _repoPath, "git", new string[] {"reset", "--hard", "FETCH_HEAD"});
-                        await GitCheckedSubmoduleUpdate();
+                        await GitResetToFetchHead(cancel);
+                        await GitCheckedSubmoduleUpdate(cancel);
                     }
                     catch (Exception ex)
                     {
@@ -241,7 +253,7 @@ namespace SS14.Watchdog.Components.Updates
 
                 if (_hybridACZ)
                 {
-                    await CommandHelperChecked("Failed to build Hybrid ACZ package", _repoPath, "python", new string[] {"Tools/package_server_build.py", "--hybrid-acz", "-p", serverPlatform}, cancel);
+                    await CommandHelperChecked("Failed to build Hybrid ACZ package", _repoPath, "python", new[] {"Tools/package_server_build.py", "--hybrid-acz", "-p", serverPlatform}, cancel);
                 }
                 else
                 {
@@ -253,12 +265,12 @@ namespace SS14.Watchdog.Components.Updates
 
                     _logger.LogTrace("Building client packages...");
 
-                    await CommandHelperChecked("Failed to build client packages", _repoPath, "python", new string[] {"Tools/package_client_build.py"}, cancel);
+                    await CommandHelperChecked("Failed to build client packages", _repoPath, "python", new[] {"Tools/package_client_build.py"}, cancel);
 
                     File.Move(Path.Combine(_repoPath, "release", ClientZipName), Path.Combine(binariesPath, ClientZipName), true);
 
                     _logger.LogTrace("Building server packages...");
-                    await CommandHelperChecked("Failed to build server packages", _repoPath, "python", new string[] {"Tools/package_server_build.py", "-p", serverPlatform}, cancel);
+                    await CommandHelperChecked("Failed to build server packages", _repoPath, "python", new[] {"Tools/package_server_build.py", "-p", serverPlatform}, cancel);
 
                     // Unless using Hybrid ACZ, a build.json file must be written.
                     await using (var stream = File.Open(serverPackage, FileMode.Open))
