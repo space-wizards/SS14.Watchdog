@@ -18,7 +18,7 @@ FROM mcr.microsoft.com/dotnet/sdk:6.0
 
 # dependencies
 RUN apt-get update \
-  && apt-get install -y git python3
+  && apt-get install -y git python3 python-is-python3
 
 WORKDIR /app
 COPY --from=build /app ./
