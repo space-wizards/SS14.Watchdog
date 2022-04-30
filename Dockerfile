@@ -26,6 +26,8 @@ COPY --from=build /app ./
 EXPOSE 5000
 EXPOSE 1212
 
+ENV DOTNET_ENVIRONMENT Development
+
 VOLUME ["/app/instances"]
 
 ENTRYPOINT ["/app/SS14.Watchdog"]
