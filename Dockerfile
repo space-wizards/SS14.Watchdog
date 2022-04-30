@@ -26,7 +26,7 @@ COPY --from=build /app ./
 EXPOSE 5000
 EXPOSE 1212
 
-ENV DOTNET_ENVIRONMENT Development
+ENV DOTNET_ENVIRONMENT Production
 
 VOLUME ["/app/instances"]
 
