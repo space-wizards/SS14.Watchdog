@@ -23,7 +23,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app ./
 
-EXPOSE 80
+EXPOSE 5000
 EXPOSE 1212
 
 VOLUME ["/app/instances"]
