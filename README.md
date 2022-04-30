@@ -9,7 +9,7 @@ For convenience, a docker image is provided, with an example use below:
 ```sh
 docker run \
 --name="ss14" \
--p 5000:80 \
+-p 5000:5000 \
 -p 1212:1212 \
 -p 1212:1212/udp \
 -v /path/to/appsettings.yml:/app/appsettings.yml \
