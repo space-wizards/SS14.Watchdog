@@ -17,7 +17,7 @@ namespace SS14.Watchdog.Components.Updates
 {
     public sealed class UpdateProviderManifest : UpdateProvider
     {
-        private const int DownloadTimeoutSeconds = 60;
+        private const int DownloadTimeoutSeconds = 120;
         
         private readonly HttpClient _httpClient = new();
 
