@@ -11,6 +11,21 @@ ProjectSection(SolutionItems) = preProject
 	.github\workflows\build-test.yml = .github\workflows\build-test.yml
 EndProjectSection
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{A782ED8C-562B-4683-9931-80ED8E8EC3D0}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+		.gitattributes = .gitattributes
+		.gitignore = .gitignore
+		LICENSE.txt = LICENSE.txt
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".github", ".github", "{46B23562-7C30-46DA-849C-4D5A54D7656E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "workflows", "workflows", "{9D5DE984-C9B3-4C4F-A71E-1AFFF6440FD6}"
+	ProjectSection(SolutionItems) = preProject
+		.github\workflows\build-test.yml = .github\workflows\build-test.yml
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -28,5 +43,7 @@ Global
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{2079C7B6-0E0A-41AD-9D78-FFA7406C801E} = {CFC0C37D-43CA-43FF-BEE6-204A376B8431}
+		{46B23562-7C30-46DA-849C-4D5A54D7656E} = {A782ED8C-562B-4683-9931-80ED8E8EC3D0}
+		{9D5DE984-C9B3-4C4F-A71E-1AFFF6440FD6} = {46B23562-7C30-46DA-849C-4D5A54D7656E}
 	EndGlobalSection
 EndGlobal
