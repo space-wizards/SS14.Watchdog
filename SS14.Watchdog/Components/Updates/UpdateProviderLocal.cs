@@ -60,7 +60,7 @@ namespace SS14.Watchdog.Components.Updates
             }
 
             var binariesRoot = new Uri(
-                new Uri(_configuration["BaseUrl"]),
+                new Uri(_configuration["BaseUrl"]!),
                 $"instances/{_serverInstance.Key}/binaries/");
 
             yield return new KeyValuePair<string, string>(

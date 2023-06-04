@@ -260,7 +260,7 @@ namespace SS14.Watchdog.Components.Updates
                     var binariesPath = Path.Combine(_serverInstance.InstanceDir, "binaries");
 
                     // If you get an error here: You need a BaseUrl in the root of appsettings.yml that represents the public URL of the watchdog server.
-                    var binariesRoot = new Uri(new Uri(_configuration["BaseUrl"]),
+                    var binariesRoot = new Uri(new Uri(_configuration["BaseUrl"]!),
                         $"instances/{_serverInstance.Key}/binaries/");
 
                     _logger.LogTrace("Building client packages...");

@@ -88,6 +88,9 @@ namespace SS14.Watchdog.Components.ServerManagement
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderJenkinsConfiguration>();
 
+                    if (jenkinsConfig == null)
+                        throw new InvalidOperationException("Invalid configuration!");
+                    
                     _updateProvider = new UpdateProviderJenkins(
                         jenkinsConfig, 
                         serviceProvider.GetRequiredService<ILogger<UpdateProviderJenkins>>());
@@ -98,6 +101,9 @@ namespace SS14.Watchdog.Components.ServerManagement
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderLocalConfiguration>();
 
+                    if (localConfig == null)
+                        throw new InvalidOperationException("Invalid configuration!");
+                    
                     _updateProvider = new UpdateProviderLocal(
                         this,
                         localConfig, 
@@ -110,6 +116,9 @@ namespace SS14.Watchdog.Components.ServerManagement
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderGitConfiguration>();
 
+                    if (gitConfig == null)
+                        throw new InvalidOperationException("Invalid configuration!");
+
                     _updateProvider = new UpdateProviderGit(
                         this,
                         gitConfig,
@@ -121,6 +130,9 @@ namespace SS14.Watchdog.Components.ServerManagement
                     var manifestConfig = configuration
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderManifestConfiguration>();
+                    
+                    if (manifestConfig == null)
+                        throw new InvalidOperationException("Invalid configuration!");
 
                     _updateProvider = new UpdateProviderManifest(
                         manifestConfig,
@@ -363,8 +375,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private void GenerateNewToken()
         {
             Span<byte> raw = stackalloc byte[64];
-            using var crypto = new RNGCryptoServiceProvider();
-            crypto.GetBytes(raw);
+            RandomNumberGenerator.Fill(raw);
 
             var token = Convert.ToBase64String(raw);
             Secret = token;

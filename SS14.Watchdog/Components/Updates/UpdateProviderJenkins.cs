@@ -27,7 +27,7 @@ namespace SS14.Watchdog.Components.Updates
         {
             _logger = logger;
             _baseUrl = configuration.BaseUrl;
-            _jobName = Uri.EscapeUriString(configuration.JobName);
+            _jobName = Uri.EscapeDataString(configuration.JobName);
         }
 
         public override async Task<bool> CheckForUpdateAsync(string? currentVersion, CancellationToken cancel = default)

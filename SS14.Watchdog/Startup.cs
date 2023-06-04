@@ -33,11 +33,11 @@ namespace SS14.Watchdog
 
             services.AddSingleton<ServerManager>();
             services.AddSingleton<IServerManager>(p => p.GetService<ServerManager>()!);
-            services.AddHostedService(p => p.GetService<ServerManager>());
+            services.AddHostedService(p => p.GetService<ServerManager>()!);
 
             services.AddSingleton<BackgroundTaskQueue>();
             services.AddSingleton<IBackgroundTaskQueue>(p => p.GetService<BackgroundTaskQueue>()!);
-            services.AddHostedService(p => p.GetService<BackgroundTaskQueue>());
+            services.AddHostedService(p => p.GetService<BackgroundTaskQueue>()!);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
