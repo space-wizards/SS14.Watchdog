@@ -48,7 +48,7 @@
         };
         vm-test = {
           type = "app";
-          program = "${self.packages.${pkgs.system}.vm-test}/bin/nixos-test-driver";
+          program = "${self.packages.${pkgs.system}.vm-test.driver}/bin/nixos-test-driver";
         };
         vm-test-interactive = {
           type = "app";
