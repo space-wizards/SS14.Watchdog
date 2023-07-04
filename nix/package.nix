@@ -1,4 +1,4 @@
-{ flake, buildFHSEnv, buildDotnetModule, dotnetCorePackages }:
+{ flake, buildFHSEnv, buildDotnetModule, dotnetCorePackages, git }:
 let
   rev = flake.rev or "dirty";
   watchdog = buildDotnetModule {
@@ -13,6 +13,8 @@ let
 
     # Generated using "fetch-deps" flake app output.
     nugetDeps = ./deps.nix;
+
+    runtimeDeps = [ git ];
 
     dotnet-sdk = with dotnetCorePackages;
       combinePackages [ sdk_7_0 aspnetcore_7_0 ];
