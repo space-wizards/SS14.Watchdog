@@ -31,9 +31,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public string Key { get; }
         public string? Secret { get; private set; }
-        public string? ApiToken => _instanceConfig.ApiTokenFile == null 
-            ? _instanceConfig.ApiToken 
-            : File.ReadAllText(_instanceConfig.ApiTokenFile);
+        public string? ApiToken => _instanceConfig.ApiToken;
 
         public bool IsRunning => _runningServerProcess != null;
 
@@ -82,6 +80,11 @@ namespace SS14.Watchdog.Components.ServerManagement
             _serversConfiguration = serversConfiguration;
             _logger = logger;
             _taskQueue = taskQueue;
+
+            if (!string.IsNullOrEmpty(_instanceConfig.ApiTokenFile))
+            {
+                _instanceConfig.ApiToken = File.ReadAllText(_instanceConfig.ApiTokenFile);
+            }
 
             switch (instanceConfig.UpdateType)
             {
