@@ -115,26 +115,18 @@ in
         StandardError = "journal";
 
         # Hardening
-        #CapabilityBoundingSet = [ "" ];
-        #DeviceAllow = [ "" ];
-        #LockPersonality = true;
-        #PrivateDevices = true;
-        #PrivateTmp = true;
-        #PrivateUsers = true;
-        #ProtectClock = true;
-        #ProtectControlGroups = true;
-        #ProtectHome = true;
-        #ProtectHostname = true;
-        #ProtectKernelLogs = true;
-        #ProtectKernelModules = true;
-        #ProtectKernelTunables = true;
-        #ProtectProc = "invisible";
-        #RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
-        #RestrictNamespaces = false;
-        #RestrictRealtime = true;
-        #RestrictSUIDSGID = true;
-        #SystemCallArchitectures = "native";
-        #UMask = "0077";
+        CapabilityBoundingSet = [ "" ];
+        DeviceAllow = [ "" ];
+        LockPersonality = true;
+        PrivateDevices = true;
+        PrivateTmp = true;
+        PrivateUsers = true;
+        ProtectClock = true;
+        ProtectHome = true;
+        RestrictRealtime = true;
+        RestrictSUIDSGID = true;
+        SystemCallArchitectures = "native";
+        UMask = "0077";
       };
 
       preStart = ''
