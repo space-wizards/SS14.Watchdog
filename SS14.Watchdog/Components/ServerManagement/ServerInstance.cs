@@ -31,7 +31,9 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public string Key { get; }
         public string? Secret { get; private set; }
-        public string? ApiToken => _instanceConfig.ApiToken;
+        public string? ApiToken => _instanceConfig.ApiTokenFile == null 
+            ? _instanceConfig.ApiToken 
+            : File.ReadAllText(_instanceConfig.ApiTokenFile);
 
         public bool IsRunning => _runningServerProcess != null;
 
