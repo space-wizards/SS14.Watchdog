@@ -18,10 +18,10 @@
         space-station-14-watchdog =
           pkgs.callPackage ./nix/package.nix { flake = self; };
         vm-test = nixos-lib.runTest {
-            name = "space-station-14-watchdog";
-            imports = [ ./nix/test.nix  ];
-            hostPkgs = pkgs;
-            extraBaseModules = { imports = [ self.nixosModules.space-station-14-watchdog ]; };
+          name = "space-station-14-watchdog";
+          imports = [ ./nix/test.nix ];
+          hostPkgs = pkgs;
+          extraBaseModules = { imports = [ self.nixosModules.space-station-14-watchdog ]; };
         };
       });
 

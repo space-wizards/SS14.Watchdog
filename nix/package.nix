@@ -23,7 +23,8 @@ let
 
     executables = [ "SS14.Watchdog" ];
   };
-in buildFHSEnv {
+in
+buildFHSEnv {
   name = "SS14.Watchdog";
 
   targetPkgs = pkgs: [ watchdog ];

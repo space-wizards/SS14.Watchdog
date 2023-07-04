@@ -1,25 +1,25 @@
 {
   nodes.machine = { ... }:
-  {
-    services.space-station-14-watchdog = {
-      enable = true;
-      openApiFirewall = true;
-      settings.Servers.Instances.Test = {
-        Name = "Test Instance";
-        ApiToken = "1234";
-        ApiPort = 1212;
-        TimeoutSeconds = 240;
-        UpdateType = "Manifest";
-        Updates.ManifestUrl = "https://central.spacestation14.io/builds/wizards/manifest.json";
-      };
-      instances.Test.configuration = {
-        status = {
-          enabled = true;
-          bind = "*:1212";
+    {
+      services.space-station-14-watchdog = {
+        enable = true;
+        openApiFirewall = true;
+        settings.Servers.Instances.Test = {
+          Name = "Test Instance";
+          ApiToken = "1234";
+          ApiPort = 1212;
+          TimeoutSeconds = 240;
+          UpdateType = "Manifest";
+          Updates.ManifestUrl = "https://central.spacestation14.io/builds/wizards/manifest.json";
+        };
+        instances.Test.configuration = {
+          status = {
+            enabled = true;
+            bind = "*:1212";
+          };
         };
       };
     };
-  };
 
   testScript = ''
     machine.start()
