@@ -1,4 +1,4 @@
-{ flake, buildFHSEnv, buildDotnetModule, dotnetCorePackages, git }:
+{ flake, buildFHSEnv, buildDotnetModule, dotnetCorePackages, git, python3 }:
 let
   rev = flake.rev or "dirty";
   watchdog = buildDotnetModule {
@@ -14,7 +14,7 @@ let
     # Generated using "fetch-deps" flake app output.
     nugetDeps = ./deps.nix;
 
-    runtimeDeps = [ git ];
+    runtimeDeps = [ git python3 ];
 
     dotnet-sdk = with dotnetCorePackages;
       combinePackages [ sdk_7_0 aspnetcore_7_0 ];
@@ -27,7 +27,7 @@ in
 buildFHSEnv {
   name = "SS14.Watchdog";
 
-  targetPkgs = pkgs: [ watchdog git ];
+  targetPkgs = pkgs: [ watchdog git python3 ];
 
   runScript = "SS14.Watchdog";
 
