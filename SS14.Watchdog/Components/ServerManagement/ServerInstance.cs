@@ -81,6 +81,11 @@ namespace SS14.Watchdog.Components.ServerManagement
             _logger = logger;
             _taskQueue = taskQueue;
 
+            if (!string.IsNullOrEmpty(_instanceConfig.ApiTokenFile))
+            {
+                _instanceConfig.ApiToken = File.ReadAllText(_instanceConfig.ApiTokenFile);
+            }
+
             switch (instanceConfig.UpdateType)
             {
                 case "Jenkins":

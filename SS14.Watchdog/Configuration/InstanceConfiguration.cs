@@ -10,6 +10,11 @@ namespace SS14.Watchdog.Configuration
     {
         public string? Name { get; set; }
         public string? UpdateType { get; set; }
+        /// <summary>
+        ///     API Token will be read from this file if set.
+        ///     Takes priority over <see cref="ApiToken"/> if not null.
+        /// </summary>
+        public string? ApiTokenFile { get; set; }
         public string? ApiToken { get; set; }
         public ushort ApiPort { get; set; }
 
