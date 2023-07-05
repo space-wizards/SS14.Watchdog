@@ -27,7 +27,7 @@ in
 buildFHSEnv {
   name = "SS14.Watchdog";
 
-  targetPkgs = pkgs: [ watchdog ];
+  targetPkgs = pkgs: [ watchdog git ];
 
   runScript = "SS14.Watchdog";
 

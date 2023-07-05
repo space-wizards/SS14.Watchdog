@@ -57,8 +57,8 @@
       });
 
       nixosModules = {
-        space-station-14-watchdog = import ./nix/module.nix self;
         default = self.nixosModules.space-station-14-watchdog;
+        space-station-14-watchdog = import ./nix/module.nix self;
       };
 
       formatter = forAllSystems (pkgs: pkgs.nixpkgs-fmt);
