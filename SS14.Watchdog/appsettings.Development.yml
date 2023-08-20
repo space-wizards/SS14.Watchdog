@@ -10,6 +10,7 @@ Serilog:
   WriteTo:
     - Name: Console
       Args:
+        Theme: "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console"
         OutputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}"
         
   Enrich: [ "FromLogContext" ]
@@ -19,6 +20,9 @@ Serilog:
   #  Name: "Test"
 
 BaseUrl: "http://localhost:5000/"
+
+Data:
+  File: bin/data.db
 
 Servers:
   InstanceRoot: "bin/instances"
@@ -51,3 +55,4 @@ Servers:
       UpdateType: "Manifest"
       Updates:
         ManifestUrl: "https://central.spacestation14.io/builds/wizards/manifest.json"
+      TimeoutSeconds: 90
