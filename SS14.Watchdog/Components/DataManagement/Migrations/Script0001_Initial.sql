@@ -1,0 +1,2 @@
+-- Yeah I kinda wanna make semi-atomic commits, so the first migration is empty.
+-- Meh.

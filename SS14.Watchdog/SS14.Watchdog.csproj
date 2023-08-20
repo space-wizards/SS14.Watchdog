@@ -17,6 +17,8 @@
       <PackageReference Include="Serilog.Settings.Configuration" Version="7.0.0" />
       <PackageReference Include="Serilog.Sinks.Console" Version="4.1.0" />
       <PackageReference Include="Serilog.Sinks.Loki" Version="3.0.1-beta1" />
+      <PackageReference Include="Dapper" Version="2.0.151" />
+      <PackageReference Include="Microsoft.Data.Sqlite" Version="7.0.10" />
     </ItemGroup>
 
     <ItemGroup>
@@ -29,4 +31,9 @@
         </EmbeddedResource>
     </ItemGroup>
 
+    <ItemGroup>
+        <None Remove="Components\DataManagement\Migrations\*.sql" />
+        <EmbeddedResource Include="Components\DataManagement\Migrations\*.sql" />
+    </ItemGroup>
+    
 </Project>

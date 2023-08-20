@@ -9,6 +9,7 @@ using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Serilog;
 using SS14.Watchdog.Components.BackgroundTasks;
+using SS14.Watchdog.Components.DataManagement;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Configuration;
 
@@ -27,7 +28,11 @@ namespace SS14.Watchdog
         [UsedImplicitly]
         public void ConfigureServices(IServiceCollection services)
         {
+            services.Configure<DataOptions>(Configuration.GetSection(DataOptions.Position));
             services.Configure<ServersConfiguration>(Configuration.GetSection("Servers"));
+
+            services.AddSingleton<DataManager>();
+            services.AddHostedService(p => p.GetService<DataManager>()!);
 
             services.AddControllers();
 
