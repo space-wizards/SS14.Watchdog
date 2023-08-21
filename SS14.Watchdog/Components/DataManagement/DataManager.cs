@@ -41,7 +41,7 @@ public sealed class DataManager : IHostedService
         }.ToString();
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    Task IHostedService.StartAsync(CancellationToken cancellationToken)
     {
         var con = OpenConnection();
 
@@ -51,7 +51,7 @@ public sealed class DataManager : IHostedService
         return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    Task IHostedService.StopAsync(CancellationToken cancellationToken)
     {
         // No shutdown needed.
         return Task.CompletedTask;

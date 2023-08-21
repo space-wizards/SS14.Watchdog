@@ -7,12 +7,14 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Dapper;
 using JetBrains.Annotations;
 using Microsoft.Diagnostics.NETCore.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SS14.Watchdog.Components.BackgroundTasks;
+using SS14.Watchdog.Components.DataManagement;
 using SS14.Watchdog.Components.Updates;
 using SS14.Watchdog.Configuration;
 using SS14.Watchdog.Configuration.Updates;
@@ -39,7 +41,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         ///     How long since the last ping before we consider the server "dead" and forcefully terminate it.
         /// </summary>
         private TimeSpan PingTimeoutDelay => TimeSpan.FromSeconds(_instanceConfig.TimeoutSeconds);
-        
+
         private readonly SemaphoreSlim _stateLock = new SemaphoreSlim(1, 1);
 
         private readonly HttpClient _serverHttpClient = new HttpClient();
@@ -50,6 +52,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly ServersConfiguration _serversConfiguration;
         private readonly ILogger<ServerInstance> _logger;
         private readonly IBackgroundTaskQueue _taskQueue;
+        private readonly DataManager _dataManager;
 
         private string? _currentRevision;
         private bool _updateOnRestart = true;
@@ -68,11 +71,12 @@ namespace SS14.Watchdog.Components.ServerManagement
         public ServerInstance(
             string key,
             InstanceConfiguration instanceConfig,
-            IConfiguration configuration, 
+            IConfiguration configuration,
             ServersConfiguration serversConfiguration,
             ILogger<ServerInstance> logger,
             IBackgroundTaskQueue taskQueue,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            DataManager dataManager)
         {
             Key = key;
             _instanceConfig = instanceConfig;
@@ -80,6 +84,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             _serversConfiguration = serversConfiguration;
             _logger = logger;
             _taskQueue = taskQueue;
+            _dataManager = dataManager;
 
             if (!string.IsNullOrEmpty(_instanceConfig.ApiTokenFile))
             {
@@ -95,9 +100,9 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                     if (jenkinsConfig == null)
                         throw new InvalidOperationException("Invalid configuration!");
-                    
+
                     _updateProvider = new UpdateProviderJenkins(
-                        jenkinsConfig, 
+                        jenkinsConfig,
                         serviceProvider.GetRequiredService<ILogger<UpdateProviderJenkins>>());
                     break;
 
@@ -108,14 +113,14 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                     if (localConfig == null)
                         throw new InvalidOperationException("Invalid configuration!");
-                    
+
                     _updateProvider = new UpdateProviderLocal(
                         this,
-                        localConfig, 
+                        localConfig,
                         serviceProvider.GetRequiredService<ILogger<UpdateProviderLocal>>(),
                         configuration);
                     break;
-                
+
                 case "Git":
                     var gitConfig = configuration
                         .GetSection($"Servers:Instances:{key}:Updates")
@@ -130,12 +135,12 @@ namespace SS14.Watchdog.Components.ServerManagement
                         serviceProvider.GetRequiredService<ILogger<UpdateProviderGit>>(),
                         configuration);
                     break;
-                
+
                 case "Manifest":
                     var manifestConfig = configuration
                         .GetSection($"Servers:Instances:{key}:Updates")
                         .Get<UpdateProviderManifestConfiguration>();
-                    
+
                     if (manifestConfig == null)
                         throw new InvalidOperationException("Invalid configuration!");
 
@@ -169,36 +174,30 @@ namespace SS14.Watchdog.Components.ServerManagement
         {
             _instanceConfig = cfg;
         }
-        
+
         private void LoadData()
         {
-            var dataPath = Path.Combine(InstanceDir, "data.json");
+            using var con = _dataManager.OpenConnection();
 
-            string fileData;
-            try
-            {
-                fileData = File.ReadAllText(dataPath);
-            }
-            catch (FileNotFoundException)
-            {
-                // Data file doesn't exist, nothing needs to be loaded since we init to defaults.
-                return;
-            }
-
-            var data = JsonSerializer.Deserialize<InstanceData>(fileData)!;
+            var revision = con.QuerySingle<string>(
+                "SELECT Revision FROM ServerInstance WHERE Key = @Key",
+                new { Key });
 
             // Actually copy data over.
-            _currentRevision = data.CurrentRevision;
+            _currentRevision = revision;
         }
 
         private void SaveData()
         {
-            var dataPath = Path.Combine(InstanceDir, "data.json");
+            using var con = _dataManager.OpenConnection();
 
-            File.WriteAllText(dataPath, JsonSerializer.Serialize(new InstanceData
-            {
-                CurrentRevision = _currentRevision
-            }));
+            con.Execute(
+                "UPDATE ServerInstance SET Revision = @Revision WHERE Key = @Key",
+                new
+                {
+                    Revision = _currentRevision,
+                    Key
+                });
         }
 
         public async Task StartAsync()
@@ -245,7 +244,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                         var newRevision = await _updateProvider.RunUpdateAsync(
                             _currentRevision,
                             Path.Combine(InstanceDir, "bin"));
-                        
+
                         if (newRevision != null)
                         {
                             _logger.LogDebug("Updated from {current} to {new}.",
@@ -477,20 +476,20 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             if (_runningServerProcess == null)
                 return;
-            
+
             if (_instanceConfig.DumpOnTimeout)
             {
                 if (!OperatingSystem.IsWindows())
                 {
-                    _logger.LogInformation("{Key}: making on-kill process dump of type {DumpType}", 
-                    Key, _instanceConfig.TimeoutDumpType);
+                    _logger.LogInformation("{Key}: making on-kill process dump of type {DumpType}",
+                        Key, _instanceConfig.TimeoutDumpType);
 
                     try
                     {
                         var dumpDir = Path.Combine(InstanceDir, "dumps");
                         Directory.CreateDirectory(dumpDir);
                         var dumpFile = Path.Combine(dumpDir, $"dump_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}");
-                        
+
                         var client = new DiagnosticsClient(_runningServerProcess.Id);
                         client.WriteDump(_instanceConfig.TimeoutDumpType, dumpFile);
 
@@ -508,7 +507,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                 _logger.LogInformation("{Key}: killing process...", Key);
             }
-            
+
             _runningServerProcess.Kill();
         }
 
@@ -552,7 +551,8 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         private async Task SendUpdateNotificationAsync(CancellationToken cancel = default)
         {
-            var resp = await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null!, cancel);
+            var resp = await _serverHttpClient.PostAsync($"http://localhost:{_instanceConfig.ApiPort}/update", null!,
+                cancel);
 
             if (!resp.IsSuccessStatusCode)
             {

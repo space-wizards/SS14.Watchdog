@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Dapper;
 using JetBrains.Annotations;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SS14.Watchdog.Components.BackgroundTasks;
+using SS14.Watchdog.Components.DataManagement;
 using SS14.Watchdog.Configuration;
 
 namespace SS14.Watchdog.Components.ServerManagement
@@ -22,6 +24,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly ILogger<ServerManager> _logger;
         private readonly IBackgroundTaskQueue _taskQueue;
         private readonly IServiceProvider _provider;
+        private readonly DataManager _dataManager;
         private readonly IConfiguration _configuration;
         private readonly IOptionsMonitor<ServersConfiguration> _serverCfg; 
         private readonly Dictionary<string, ServerInstance> _instances = new Dictionary<string, ServerInstance>();
@@ -33,12 +36,14 @@ namespace SS14.Watchdog.Components.ServerManagement
             ILogger<ServerManager> logger,
             IConfiguration configuration,
             IBackgroundTaskQueue taskQueue,
-            IServiceProvider provider)
+            IServiceProvider provider,
+            DataManager dataManager)
         {
             _logger = logger;
             _configuration = configuration;
             _taskQueue = taskQueue;
             _provider = provider;
+            _dataManager = dataManager;
             _serverCfg = instancesOptions;
         }
 
@@ -77,7 +82,20 @@ namespace SS14.Watchdog.Components.ServerManagement
                 Directory.CreateDirectory(instanceRoot);
                 _logger.LogInformation("Created InstanceRoot {InstanceRoot}", instanceRoot);
             }
-            
+
+            // Populate database with server instances.
+            using (var con = _dataManager.OpenConnection())
+            {
+                var tx = con.BeginTransaction();
+
+                foreach (var key in options.Instances.Keys)
+                {
+                    con.Execute("INSERT OR IGNORE INTO ServerInstance (Key) VALUES (@Key)", new { Key = key });
+                }
+
+                tx.Commit();
+            }
+
             // Init server instances.
             foreach (var (key, instanceOptions) in options.Instances)
             {
@@ -85,14 +103,15 @@ namespace SS14.Watchdog.Components.ServerManagement
 
                 var instance =
                     new ServerInstance(
-                        key, 
+                        key,
                         instanceOptions,
                         _configuration,
                         options,
                         _provider.GetRequiredService<ILogger<ServerInstance>>(),
                         _taskQueue,
-                        _provider);
-                
+                        _provider,
+                        _dataManager);
+
                 _instances.Add(key, instance);
             }
 
