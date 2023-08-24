@@ -39,7 +39,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         /// <summary>
         ///     Server has sent a ping to the watchdog confirming that it is, in fact, still alive.
         /// </summary>
-        void PingReceived();
+        Task PingReceived();
 
         /// <summary>
         ///     Check for update and inform game server of available update if there is one.

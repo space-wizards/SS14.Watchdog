@@ -64,7 +64,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             // Start server instances in background while main host loads.
             foreach (var instance in _instances.Values)
             {
-                tasks.Add(instance.StartAsync());
+                tasks.Add(instance.StartAsync(stoppingToken));
             }
 
             await Task.WhenAll(tasks);
@@ -132,7 +132,19 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public override async Task StopAsync(CancellationToken cancellationToken)
         {
-            await Task.WhenAll(_instances.Values.Select(i => i.ShutdownAsync(cancellationToken)));
+            try
+            {
+                await base.StopAsync(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                // Ah heck. We're shutting down forcefully.
+                // At least try to kill the server processes I guess (if necessary).
+                foreach (var instance in _instances.Values)
+                {
+                    instance.ForceShutdown();
+                }
+            }
         }
     }
 }

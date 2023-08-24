@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Utility;
@@ -20,14 +21,14 @@ namespace SS14.Watchdog.Controllers
         }
 
         [HttpPost("ping")]
-        public IActionResult Ping([FromHeader(Name = "Authorization")] string authorization, string key)
+        public async Task<IActionResult> PingAsync([FromHeader(Name = "Authorization")] string authorization, string key)
         {
             if (!TryAuthorize(authorization, key, out var failure, out var instance))
             {
                 return failure;
             }
 
-            instance.PingReceived();
+            await instance.PingReceived();
             return Ok();
         }
 
