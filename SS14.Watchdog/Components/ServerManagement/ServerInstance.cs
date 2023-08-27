@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -9,12 +8,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using JetBrains.Annotations;
-using Microsoft.Diagnostics.NETCore.Client;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.DataManagement;
+using SS14.Watchdog.Components.ProcessManagement;
 using SS14.Watchdog.Components.Updates;
 using SS14.Watchdog.Configuration;
 using SS14.Watchdog.Configuration.Updates;
@@ -35,7 +34,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         public string? Secret { get; private set; }
         public string? ApiToken => _instanceConfig.ApiToken;
 
-        public bool IsRunning => _runningServerProcess != null;
+        public bool IsRunning => _runningServer != null;
 
         /// <summary>
         ///     How long since the last ping before we consider the server "dead" and forcefully terminate it.
@@ -51,6 +50,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly ILogger<ServerInstance> _logger;
         private readonly IBackgroundTaskQueue _taskQueue;
         private readonly DataManager _dataManager;
+        private readonly IProcessManager _processManager;
 
         private string? _currentRevision;
         private bool _updateOnRestart = true;
@@ -59,7 +59,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private bool _startupFailUpdateWait;
         private int _loadFailCount;
 
-        private Process? _runningServerProcess;
+        private IProcessHandle? _runningServer;
 
         public ServerInstance(
             string key,
@@ -69,7 +69,8 @@ namespace SS14.Watchdog.Components.ServerManagement
             ILogger<ServerInstance> logger,
             IBackgroundTaskQueue taskQueue,
             IServiceProvider serviceProvider,
-            DataManager dataManager)
+            DataManager dataManager,
+            IProcessManager processManager)
         {
             Key = key;
             _instanceConfig = instanceConfig;
@@ -78,6 +79,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             _logger = logger;
             _taskQueue = taskQueue;
             _dataManager = dataManager;
+            _processManager = processManager;
 
             if (!string.IsNullOrEmpty(_instanceConfig.ApiTokenFile))
             {
@@ -199,6 +201,12 @@ namespace SS14.Watchdog.Components.ServerManagement
             RandomNumberGenerator.Fill(raw);
 
             var token = Convert.ToBase64String(raw);
+
+            SetToken(token);
+        }
+
+        private void SetToken(string token)
+        {
             Secret = token;
             _logger.LogTrace("Server token is {Token}", token);
 
@@ -219,15 +227,18 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public async Task ShutdownAsync()
         {
-            if (_runningServerProcess != null)
+            _logger.LogTrace("Shutting down server instance {Key}", Key);
+
+            if (IsRunning)
             {
+                _logger.LogInformation("Shutting down running server {Key}", Key);
                 await ForceShutdownServerAsync();
             }
         }
 
         public void ForceShutdown()
         {
-            _runningServerProcess?.Kill(true);
+            _runningServer?.Kill();
         }
 
         public async Task PingReceived()
@@ -243,7 +254,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         {
             _serverTimeoutTcs?.Cancel();
 
-            var number = _serverTimeoutNumber++;
+            var number = ++_serverTimeoutNumber;
 
             _serverTimeoutTcs = new CancellationTokenSource();
 
@@ -268,7 +279,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         {
             _logger.LogWarning("{Key}: timed out, killing", Key);
 
-            if (_runningServerProcess == null)
+            if (_runningServer == null)
                 return;
 
             if (_instanceConfig.DumpOnTimeout)
@@ -284,8 +295,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                         Directory.CreateDirectory(dumpDir);
                         var dumpFile = Path.Combine(dumpDir, $"dump_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}");
 
-                        var client = new DiagnosticsClient(_runningServerProcess.Id);
-                        client.WriteDump(_instanceConfig.TimeoutDumpType, dumpFile);
+                        _runningServer.DumpProcess(dumpFile, _instanceConfig.TimeoutDumpType);
 
                         _logger.LogInformation("{Key}: Process dump written to {DumpFilePath}", Key, dumpFile);
                     }
@@ -302,7 +312,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                 _logger.LogInformation("{Key}: killing process...", Key);
             }
 
-            _runningServerProcess.Kill();
+            _runningServer.Kill();
 
             // Monitor will notice server died and pick it up.
         }
@@ -340,7 +350,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
         {
-            var proc = _runningServerProcess;
+            var proc = _runningServer;
             if (proc == null || proc.HasExited)
             {
                 return;
@@ -348,11 +358,20 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             try
             {
-                await SendShutdownNotificationAsync(cancel);
+                var shutdownCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+                // Give it 5 seconds to respond.
+                shutdownCts.CancelAfter(5000);
+                await SendShutdownNotificationAsync(shutdownCts.Token);
             }
             catch (HttpRequestException e)
             {
                 _logger.LogInformation(e, "Exception sending shutdown notification to server. Killing.");
+                proc.Kill();
+                return;
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Timeout sending shutdown notification to server. Killing.");
                 proc.Kill();
                 return;
             }
@@ -364,9 +383,6 @@ namespace SS14.Watchdog.Components.ServerManagement
             {
                 proc.Kill();
             }
-
-            await proc.WaitForExitAsync(cancel);
-            _runningServerProcess = null;
         }
 
         public async Task SendShutdownNotificationAsync(CancellationToken cancel = default)

@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Runtime;
 using JetBrains.Annotations;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.DataManagement;
+using SS14.Watchdog.Components.ProcessManagement;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Configuration;
 
@@ -33,6 +35,19 @@ namespace SS14.Watchdog
 
             services.AddSingleton<DataManager>();
             services.AddHostedService(p => p.GetService<DataManager>()!);
+
+            var processOptions = new ProcessOptions();
+            var processSection = Configuration.GetSection(ProcessOptions.Position);
+            processSection.Bind(processOptions);
+            switch (processOptions.Mode)
+            {
+                case ProcessMode.Basic:
+                    services.Configure<ProcessOptions>(processSection);
+                    services.AddSingleton<IProcessManager, ProcessManagerBasic>();
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException($"Invalid process mode: {processOptions.Mode}");
+            }
 
             services.AddControllers();
 

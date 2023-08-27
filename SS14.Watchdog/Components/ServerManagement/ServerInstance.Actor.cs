@@ -1,10 +1,12 @@
 using System;
-using System.Diagnostics;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
+using Dapper;
 using Microsoft.Extensions.Logging;
+using SS14.Watchdog.Components.ProcessManagement;
 
 namespace SS14.Watchdog.Components.ServerManagement;
 
@@ -41,6 +43,7 @@ public sealed partial class ServerInstance
     {
         _logger.LogDebug("Starting server {Key}", Key);
 
+        await TryLoadPersistedProcess(cancel);
         await _commandQueue.Writer.WriteAsync(new CommandStart(), cancel);
 
         try
@@ -64,6 +67,42 @@ public sealed partial class ServerInstance
 
             await ShutdownAsync();
         }
+    }
+
+    private async Task TryLoadPersistedProcess(CancellationToken cancel)
+    {
+        if (!_processManager.CanPersist)
+            return;
+
+        string? token;
+        {
+            using var con = _dataManager.OpenConnection();
+            token = con.QuerySingle<string?>(
+                "SELECT PersistedToken FROM ServerInstance WHERE Key = @Key",
+                new { Key });
+        }
+
+        if (token == null)
+        {
+            _logger.LogDebug("No persisted server token, not trying to load persisted process.");
+            return;
+        }
+
+        _logger.LogInformation("Trying to load persisted server process...");
+
+        var handle = await _processManager.TryGetPersistedServer(this, GetProgramPath(), cancel);
+        if (handle == null)
+        {
+            _logger.LogInformation("Couldn't load persisted process");
+            return;
+        }
+
+        _logger.LogInformation("Loading persisted process: {Process}", handle);
+        _runningServer = handle;
+
+        SetToken(token);
+
+        MonitorServer(++_startNumber, cancel);
     }
 
     private async Task CommandLoop(CancellationToken cancel)
@@ -107,7 +146,7 @@ public sealed partial class ServerInstance
 
     private async Task RunCommandRestart(CancellationToken cancel)
     {
-        if (_runningServerProcess == null)
+        if (_runningServer == null)
         {
             _loadFailCount = 0;
             _startupFailUpdateWait = false;
@@ -141,6 +180,8 @@ public sealed partial class ServerInstance
     {
         if (timedOut.TimeoutCounter != _serverTimeoutNumber)
         {
+            _logger.LogTrace("Timeout was wrong number, ignoring");
+
             // Guard against race condition: the timeout could happen just before we can cancel it
             // (due to ping, server shutdown, etc).
             // We use the sequence number to avoid letting it go through in that case.
@@ -177,7 +218,7 @@ public sealed partial class ServerInstance
             return;
         }
 
-        _runningServerProcess = null;
+        _runningServer = null;
         if (_lastPing == null)
         {
             // If the server shuts down before sending a ping, ever, we assume it crashed during init.
@@ -211,7 +252,7 @@ public sealed partial class ServerInstance
     {
         _logger.LogDebug("{Key}: starting server", Key);
 
-        if (_runningServerProcess != null)
+        if (_runningServer != null)
         {
             _logger.LogTrace("Start called while already have running server process, ignoring");
             return;
@@ -226,31 +267,37 @@ public sealed partial class ServerInstance
 
         GenerateNewToken();
 
+        {
+            using var con = _dataManager.OpenConnection();
+            con.Execute(
+                "UPDATE ServerInstance SET PersistedToken = @Secret WHERE Key = @Key",
+                new
+                {
+                    Secret,
+                    Key
+                });
+        }
+
         _lastPing = null;
         _startNumber++;
 
         _logger.LogTrace("Getting launch info...");
 
-        var startInfo = new ProcessStartInfo
+        var args = new List<string>
         {
-            WorkingDirectory = InstanceDir,
-            FileName = Path.Combine(InstanceDir, _instanceConfig.RunCommand),
-            UseShellExecute = false,
-            ArgumentList =
-            {
-                // Watchdog comms config.
-                "--cvar", $"watchdog.token={Secret}",
-                "--cvar", $"watchdog.key={Key}",
-                "--cvar", $"watchdog.baseUrl={_configuration["BaseUrl"]}",
+            // Watchdog comms config.
+            "--cvar", $"watchdog.token={Secret}",
+            "--cvar", $"watchdog.key={Key}",
+            "--cvar", $"watchdog.baseUrl={_configuration["BaseUrl"]}",
 
-                "--config-file", Path.Combine(InstanceDir, "config.toml"),
-                "--data-dir", Path.Combine(InstanceDir, "data"),
-            }
+            "--config-file", Path.Combine(InstanceDir, "config.toml"),
+            "--data-dir", Path.Combine(InstanceDir, "data"),
         };
+        var env = new List<(string, string)>();
 
         foreach (var (envVar, value) in _instanceConfig.EnvironmentVariables)
         {
-            startInfo.Environment[envVar] = value;
+            env.Add((envVar, value));
         }
 
         // Add current build information.
@@ -258,16 +305,22 @@ public sealed partial class ServerInstance
         {
             foreach (var (cVar, value) in _updateProvider.GetLaunchCVarOverrides(_currentRevision))
             {
-                startInfo.ArgumentList.Add("--cvar");
-                startInfo.ArgumentList.Add($"{cVar}={value}");
+                args.Add("--cvar");
+                args.Add($"{cVar}={value}");
             }
         }
+
+        var startData = new ProcessStartData(
+            GetProgramPath(),
+            InstanceDir,
+            args,
+            env);
 
         _logger.LogTrace("Launching...");
         try
         {
-            _runningServerProcess = Process.Start(startInfo);
-            _logger.LogDebug("Launched! PID: {pid}", _runningServerProcess!.Id);
+            _runningServer = await _processManager.StartServer(this, startData, cancel);
+            _logger.LogDebug("Launched! {Process}", _runningServer);
         }
         catch (Exception e)
         {
@@ -277,19 +330,24 @@ public sealed partial class ServerInstance
         MonitorServer(_startNumber, cancel);
     }
 
+    private string GetProgramPath()
+    {
+        return Path.Combine(InstanceDir, _instanceConfig.RunCommand);
+    }
+
     private async void MonitorServer(int startNumber, CancellationToken cancel = default)
     {
-        if (_runningServerProcess == null)
+        if (_runningServer == null)
             return;
 
         _logger.LogDebug("Starting to monitor running server");
 
         try
         {
-            await _runningServerProcess.WaitForExitAsync(cancel);
+            await _runningServer.WaitForExitAsync(cancel);
 
             _logger.LogInformation("{Key} shut down with exit code {ExitCode}", Key,
-                _runningServerProcess.ExitCode);
+                _runningServer.ExitCode);
 
             await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber), cancel);
         }

@@ -24,6 +24,9 @@ BaseUrl: "http://localhost:5000/"
 Data:
   File: bin/data.db
 
+Process:
+  PersistServers: true
+
 Servers:
   InstanceRoot: "bin/instances"
   Instances:

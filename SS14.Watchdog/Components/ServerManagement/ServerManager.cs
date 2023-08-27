@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -14,6 +13,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.DataManagement;
+using SS14.Watchdog.Components.ProcessManagement;
 using SS14.Watchdog.Configuration;
 
 namespace SS14.Watchdog.Components.ServerManagement
@@ -25,6 +25,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly IBackgroundTaskQueue _taskQueue;
         private readonly IServiceProvider _provider;
         private readonly DataManager _dataManager;
+        private readonly IProcessManager _processManager;
         private readonly IConfiguration _configuration;
         private readonly IOptionsMonitor<ServersConfiguration> _serverCfg; 
         private readonly Dictionary<string, ServerInstance> _instances = new Dictionary<string, ServerInstance>();
@@ -37,13 +38,15 @@ namespace SS14.Watchdog.Components.ServerManagement
             IConfiguration configuration,
             IBackgroundTaskQueue taskQueue,
             IServiceProvider provider,
-            DataManager dataManager)
+            DataManager dataManager,
+            IProcessManager processManager)
         {
             _logger = logger;
             _configuration = configuration;
             _taskQueue = taskQueue;
             _provider = provider;
             _dataManager = dataManager;
+            _processManager = processManager;
             _serverCfg = instancesOptions;
         }
 
@@ -110,7 +113,8 @@ namespace SS14.Watchdog.Components.ServerManagement
                         _provider.GetRequiredService<ILogger<ServerInstance>>(),
                         _taskQueue,
                         _provider,
-                        _dataManager);
+                        _dataManager,
+                        _processManager);
 
                 _instances.Add(key, instance);
             }
