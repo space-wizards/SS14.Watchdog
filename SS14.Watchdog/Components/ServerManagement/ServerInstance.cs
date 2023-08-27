@@ -376,13 +376,22 @@ namespace SS14.Watchdog.Components.ServerManagement
                 return;
             }
 
-            // Give it 5 seconds to shut down.
-            await Task.WhenAny(proc.WaitForExitAsync(cancel), Task.Delay(5000, cancel));
+            _logger.LogDebug("{Key} sent shutdown notification to server. Waiting for exit", Key);
 
-            if (!proc.HasExited)
+            // Give it 5 seconds to shut down.
+            var waitCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+            waitCts.CancelAfter(5000);
+            try
             {
+                await proc.WaitForExitAsync(cancel);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("{Key} did not gracefully shut down in time, killing");
                 proc.Kill();
             }
+
+            _logger.LogInformation("{Key} shut down gracefully", Key);
         }
 
         public async Task SendShutdownNotificationAsync(CancellationToken cancel = default)
