@@ -10,6 +10,7 @@ namespace SS14.Watchdog.Components.ProcessManagement;
 /// Responsible for managing game server processes: start, stop, persistence.
 /// </summary>
 /// <seealso cref="IProcessHandle"/>
+/// <seealso cref="ProcessOptions"/>
 public interface IProcessManager
 {
     bool CanPersist { get; }
@@ -29,6 +30,7 @@ public interface IProcessManager
 /// </summary>
 /// <param name="Program">The program to run to launch the game server. Full path.</param>
 /// <param name="WorkingDirectory">The working directory of the launched process.</param>
+/// <seealso cref="IProcessHandle"/>
 public sealed record ProcessStartData(
     string Program,
     string WorkingDirectory,
@@ -98,7 +100,7 @@ public enum ProcessExitReason
     /// as the game handles that and manually returns exit code signum + 128.
     /// </remarks>
     Signal,
-    
+
     /// <summary>
     /// Process crashed and dumped core.
     /// </summary>

@@ -185,12 +185,14 @@ public sealed class ProcessManagerSystemd : IProcessManager, IHostedService
         return $"ss14-server-{instance.Key}.service";
     }
 
-    async Task IHostedService.StartAsync(CancellationToken cancellationToken)
+    Task IHostedService.StartAsync(CancellationToken cancellationToken)
     {
         _dbusConnection = Connection.Session;
 
         _systemd = _dbusConnection.CreateProxy<IManager>(ServiceSystemd, "/org/freedesktop/systemd1");
         //await _systemd.SubscribeAsync();
+
+        return Task.CompletedTask;
     }
 
     Task IHostedService.StopAsync(CancellationToken cancellationToken)

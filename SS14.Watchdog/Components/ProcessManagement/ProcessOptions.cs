@@ -3,6 +3,7 @@
 /// <summary>
 /// Options for server instance process management.
 /// </summary>
+/// <seealso cref="IProcessManager"/>
 public class ProcessOptions
 {
     public const string Position = "Process";
