@@ -168,9 +168,6 @@ public sealed class ProcessManagerBasic : IProcessManager
     {
         private readonly Process _process;
 
-        public bool HasExited => _process.HasExited;
-        public int ExitCode => _process.ExitCode;
-
         public Handle(Process process)
         {
             _process = process;
@@ -187,9 +184,20 @@ public sealed class ProcessManagerBasic : IProcessManager
             await _process.WaitForExitAsync(cancel);
         }
 
-        public void Kill()
+        public Task<ProcessExitStatus?> GetExitStatusAsync()
+        {
+            if (!_process.HasExited)
+                return Task.FromResult<ProcessExitStatus?>(null);
+
+            var code = _process.ExitCode;
+            return Task.FromResult<ProcessExitStatus?>(new ProcessExitStatus(ProcessExitReason.ExitCode, code));
+        }
+
+        public Task Kill()
         {
             _process.Kill(entireProcessTree: true);
+
+            return Task.CompletedTask;
         }
     }
 }
