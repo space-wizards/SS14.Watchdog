@@ -18,6 +18,11 @@ public sealed class SystemdProcessOptions : ProcessOptions
     /// e.g. <c>ss14-server-lizard.service</c> when using the default prefix and <see cref="SystemdUnitManagementMode.TransientFixed"/>.
     /// </remarks>
     public string UnitPrefix { get; set; } = "ss14-server-";
+
+    /// <summary>
+    /// Which Systemd service manager to connect to.
+    /// </summary>
+    public SystemdManager Manager { get; set; } = SystemdManager.Session;
 }
 
 /// <summary>
@@ -38,4 +43,27 @@ public enum SystemdUnitManagementMode
     /// This isn't the default because I have concerns about the need for past transient units needing to get successfully GC'd by systemd.
     /// </remarks>
     TransientFixed,
+}
+
+/// <summary>
+/// Which Systemd service manager to connect to.
+/// </summary>
+/// <seealso cref="SystemdProcessOptions"/>
+public enum SystemdManager
+{
+    /// <summary>
+    /// Connect to the session manager for the current user.
+    /// </summary>
+    /// <remarks>
+    /// The session manager must be running, and the watchdog must have the appropriate environment variables set to access the socket.
+    /// </remarks>
+    Session,
+
+    /// <summary>
+    /// Connect to the system global session manager.
+    /// </summary>
+    /// <remarks>
+    /// The watchdog must be ran as root to make use of this.
+    /// </remarks>
+    System,
 }

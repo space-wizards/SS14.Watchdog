@@ -243,7 +243,7 @@ public sealed class ProcessManagerSystemd : IProcessManager, IHostedService
 
     Task IHostedService.StartAsync(CancellationToken cancellationToken)
     {
-        _dbusConnection = Connection.Session;
+        _dbusConnection = _options.Manager == SystemdManager.Session ? Connection.Session : Connection.System;
 
         _systemd = _dbusConnection.CreateProxy<IManager>(ServiceSystemd, "/org/freedesktop/systemd1");
         //await _systemd.SubscribeAsync();
