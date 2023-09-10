@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
+using Dapper;
 using Microsoft.Diagnostics.NETCore.Client;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using SS14.Watchdog.Components.DataManagement;
 using SS14.Watchdog.Components.ServerManagement;
 using systemd1.DBus;
 using Tmds.DBus;
@@ -17,22 +20,25 @@ namespace SS14.Watchdog.Components.ProcessManagement;
 /// <summary>
 /// asdf
 /// </summary>
+/// <seealso cref="SystemdProcessOptions"/>
 public sealed class ProcessManagerSystemd : IProcessManager, IHostedService
 {
     private const string ServiceSystemd = "org.freedesktop.systemd1";
 
     private readonly ILogger<ProcessManagerSystemd> _logger;
+    private readonly SystemdProcessOptions _options;
+    private readonly DataManager _dataManager;
 
     private Connection? _dbusConnection = null!;
     private IManager? _systemd = null!;
 
-    public bool CanPersist { get; }
+    public bool CanPersist => _options.PersistServers;
 
-    public ProcessManagerSystemd(ILogger<ProcessManagerSystemd> logger, IOptions<SystemdProcessOptions> options)
+    public ProcessManagerSystemd(ILogger<ProcessManagerSystemd> logger, DataManager dataManager, IOptions<SystemdProcessOptions> options)
     {
         _logger = logger;
-
-        CanPersist = options.Value.PersistServers;
+        _options = options.Value;
+        _dataManager = dataManager;
     }
 
     public async Task<IProcessHandle> StartServer(IServerInstance instance, ProcessStartData data, CancellationToken cancel = default)
@@ -42,10 +48,19 @@ public sealed class ProcessManagerSystemd : IProcessManager, IHostedService
 
         _logger.LogDebug("Starting game server process for instance {Key}: {Program}", instance.Key, data.Program);
 
-        var unitName = GetUnitName(instance);
-        _logger.LogTrace("Unit name is {UnitName}. Making sure it doesn't exist...", unitName);
+        string unitName;
+        if (_options.UnitManagementMode == SystemdUnitManagementMode.TransientFixed)
+        {
+            unitName = GetUnitName(instance);
+            _logger.LogTrace("Unit name is {UnitName}. Making sure it doesn't exist...", unitName);
 
-        await MakeSureExistingUnitGone(unitName, cancel);
+            await MakeSureExistingUnitGone(unitName, cancel);
+        }
+        else
+        {
+            unitName = GetUnitNameRandom(instance);
+            _logger.LogTrace("Unit name is {UnitName}", unitName);
+        }
 
         var properties = new List<(string, object)>();
 
@@ -85,7 +100,30 @@ public sealed class ProcessManagerSystemd : IProcessManager, IHostedService
             Array.Empty<(string, (string, object)[])>());
 
         var unit = await _systemd.GetUnitAsync(unitName);
+
+        if (CanPersist)
+        {
+            PersistUnitName(instance, unitName);
+        }
+
         return new Handle(this, unit);
+    }
+
+    private void PersistUnitName(IServerInstance instance, string unitName)
+    {
+        _logger.LogDebug("Persisting unit name to database...");
+
+        using var con = _dataManager.OpenConnection();
+        using var tx = con.BeginTransaction();
+
+        con.Execute(
+            "UPDATE ServerInstance SET PersistedSystemdUnit = @Unit WHERE Key = @Key", new
+            {
+                Unit = unitName,
+                instance.Key
+            });
+
+        tx.Commit();
     }
 
     private async Task MakeSureExistingUnitGone(string unitName, CancellationToken cancel)
@@ -162,7 +200,19 @@ public sealed class ProcessManagerSystemd : IProcessManager, IHostedService
     {
         try
         {
-            var unitPath = await _systemd!.GetUnitAsync(GetUnitName(instance));
+            using var con = _dataManager.OpenConnection();
+            var unitName = con.QuerySingle<string?>(
+                "SELECT PersistedSystemdUnit FROM ServerInstance WHERE Key = @Key",
+                new
+                {
+                    instance.Key
+                });
+
+            _logger.LogTrace("Persisted unit name: {Pid}", unitName);
+            if (unitName == null)
+                return null;
+
+            var unitPath = await _systemd!.GetUnitAsync(unitName);
             var unit = _dbusConnection!.CreateProxy<IUnit>(ServiceSystemd, unitPath);
             var state = await unit.GetActiveStateAsync();
             if (state != "active")
@@ -180,9 +230,15 @@ public sealed class ProcessManagerSystemd : IProcessManager, IHostedService
         }
     }
 
-    private static string GetUnitName(IServerInstance instance)
+    private string GetUnitName(IServerInstance instance)
     {
-        return $"ss14-server-{instance.Key}.service";
+        return $"{_options.UnitPrefix}{instance.Key}.service";
+    }
+
+    private string GetUnitNameRandom(IServerInstance instance)
+    {
+        var random = Convert.ToHexString(RandomNumberGenerator.GetBytes(8)).ToLower();
+        return $"{_options.UnitPrefix}{instance.Key}-{random}.service";
     }
 
     Task IHostedService.StartAsync(CancellationToken cancellationToken)

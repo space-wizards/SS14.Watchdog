@@ -27,7 +27,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly DataManager _dataManager;
         private readonly IProcessManager _processManager;
         private readonly IConfiguration _configuration;
-        private readonly IOptionsMonitor<ServersConfiguration> _serverCfg; 
+        private readonly IOptionsMonitor<ServersConfiguration> _serverCfg;
         private readonly Dictionary<string, ServerInstance> _instances = new Dictionary<string, ServerInstance>();
 
         public IReadOnlyCollection<IServerInstance> Instances => _instances.Values;
@@ -67,7 +67,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             // Start server instances in background while main host loads.
             foreach (var instance in _instances.Values)
             {
-                tasks.Add(instance.StartAsync(stoppingToken));
+                tasks.Add(Task.Run(() => instance.StartAsync(stoppingToken)));
             }
 
             await Task.WhenAll(tasks);
@@ -76,10 +76,10 @@ namespace SS14.Watchdog.Components.ServerManagement
         public override async Task StartAsync(CancellationToken cancellationToken)
         {
             _serverCfg.OnChange(CfgChanged);
-            
+
             var options = _serverCfg.CurrentValue;
             var instanceRoot = Path.Combine(Environment.CurrentDirectory, options.InstanceRoot);
-            
+
             if (!Directory.Exists(instanceRoot))
             {
                 Directory.CreateDirectory(instanceRoot);
@@ -129,7 +129,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             {
                 if (!obj.Instances.TryGetValue(k, out var instanceCfg))
                     return;
-                
+
                 instance.OnConfigUpdate(instanceCfg);
             }
         }
