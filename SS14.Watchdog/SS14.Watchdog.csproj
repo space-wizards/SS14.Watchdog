@@ -35,5 +35,8 @@
         <None Remove="Components\DataManagement\Migrations\*.sql" />
         <EmbeddedResource Include="Components\DataManagement\Migrations\*.sql" />
     </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Tmds.DBus" Version="0.10.1" />
+    </ItemGroup>
     
 </Project>
