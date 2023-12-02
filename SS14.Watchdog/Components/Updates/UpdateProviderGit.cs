@@ -25,7 +25,7 @@ namespace SS14.Watchdog.Components.Updates
         private readonly ILogger<UpdateProviderGit> _logger;
         private readonly string _repoPath;
         private readonly IConfiguration _configuration;
-        private bool _newPackaging = true;
+        private bool _newPackaging;
 
         public UpdateProviderGit(ServerInstance serverInstanceInstance, UpdateProviderGitConfiguration configuration, ILogger<UpdateProviderGit> logger, IConfiguration config)
         {
@@ -262,6 +262,8 @@ namespace SS14.Watchdog.Components.Updates
                     await CommandHelperChecked("Failed to build Content Packaging",
                         _repoPath, "dotnet", new[] { "build", "Content.Packaging","--configuration", "Release", "--no-restore", "/m" }, cancel);
                 }
+                else
+                    _newPackaging = false;
 
                 if (_hybridACZ)
                 {
