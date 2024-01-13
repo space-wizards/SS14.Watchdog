@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
     <PropertyGroup>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <Version>0.3.0</Version>
         <ServerGarbageCollection>false</ServerGarbageCollection>
@@ -35,8 +35,9 @@
         <None Remove="Components\DataManagement\Migrations\*.sql" />
         <EmbeddedResource Include="Components\DataManagement\Migrations\*.sql" />
     </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="Tmds.DBus" Version="0.10.1" />
     </ItemGroup>
-    
+
 </Project>
