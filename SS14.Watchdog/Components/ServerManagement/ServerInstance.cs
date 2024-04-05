@@ -387,7 +387,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("{Key} did not gracefully shut down in time, killing");
+                _logger.LogInformation("{Key} did not gracefully shut down in time, killing", Key);
                 proc.Kill();
             }
 
