@@ -353,6 +353,11 @@ namespace SS14.Watchdog.Components.ServerManagement
             await _commandQueue.Writer.WriteAsync(new CommandRestart(), cancel);
         }
 
+        public async Task DoStopCommandAsync(ServerInstanceStopCommand stopCommand, CancellationToken cancel = default)
+        {
+            await _commandQueue.Writer.WriteAsync(new CommandStop(stopCommand), cancel);
+        }
+
         public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
         {
             var proc = _runningServer;

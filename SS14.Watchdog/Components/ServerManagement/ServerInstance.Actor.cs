@@ -40,6 +40,8 @@ public sealed partial class ServerInstance
     private int _serverTimeoutNumber;
 
     private int _startNumber;
+    // Server got an explicit stop command, will not be automatically restarted.
+    private bool _stopped;
 
     public async Task StartAsync(string baseServerAddress, CancellationToken cancel)
     {
@@ -134,6 +136,9 @@ public sealed partial class ServerInstance
             case CommandRestart:
                 await RunCommandRestart(cancel);
                 break;
+            case CommandStop stop:
+                await RunCommandStop(stop.StopCommand, cancel);
+                break;
             case CommandServerPing ping:
                 await RunCommandServerPing(ping, cancel);
                 break;
@@ -150,6 +155,12 @@ public sealed partial class ServerInstance
 
     private async Task RunCommandRestart(CancellationToken cancel)
     {
+        if (_stopped)
+        {
+            _logger.LogDebug("Clearing stopped flag due to manual server restart");
+            _stopped = false;
+        }
+
         if (_runningServer == null)
         {
             _loadFailCount = 0;
@@ -161,6 +172,18 @@ public sealed partial class ServerInstance
         await ForceShutdownServerAsync(cancel);
     }
 
+    private async Task RunCommandStop(ServerInstanceStopCommand stopCommand, CancellationToken cancel)
+    {
+        // TODO: use stopCommand to indicate more extensive error message to error.
+
+        _stopped = true;
+        if (IsRunning)
+        {
+            _logger.LogTrace("Server is running, sending fake update notification to make it stop");
+            await SendUpdateNotificationAsync(cancel);
+        }
+    }
+
     private async Task RunCommandUpdateAvailable(CommandUpdateAvailable command, CancellationToken cancel)
     {
         _updateOnRestart = command.UpdateAvailable;
@@ -170,6 +193,10 @@ public sealed partial class ServerInstance
             {
                 _logger.LogTrace("Server is running, sending update notification.");
                 await SendUpdateNotificationAsync(cancel);
+            }
+            else if (_stopped)
+            {
+                _logger.LogInformation("Not restarting server for update as it was manually stopped.");
             }
             else if (_startupFailUpdateWait)
             {
@@ -247,8 +274,16 @@ public sealed partial class ServerInstance
             _loadFailCount = 0;
         }
 
-        _logger.LogInformation("{Key}: Restarting server after exit...", Key);
-        await StartServer(cancel);
+        if (!_stopped)
+        {
+            _logger.LogInformation("{Key}: Restarting server after exit...", Key);
+            await StartServer(cancel);
+        }
+        else
+        {
+            _logger.LogInformation("{Key}: Not restarting server as it was manually stopped.", Key);
+            _notificationManager.SendNotification($"Server `{Key}` has exited after manual stop request.");
+        }
     }
 
     private async Task RunCommandStart(CancellationToken cancel)
@@ -420,6 +455,11 @@ public sealed partial class ServerInstance
     /// Command to restart the server.
     /// </summary>
     private sealed record CommandRestart : Command;
+
+    /// <summary>
+    /// Command to stop the server gracefully, without restarting it afterwards.
+    /// </summary>
+    private sealed record CommandStop(ServerInstanceStopCommand StopCommand) : Command;
 
     /// <summary>
     /// The server has failed to ping back in time, grab the axe!
