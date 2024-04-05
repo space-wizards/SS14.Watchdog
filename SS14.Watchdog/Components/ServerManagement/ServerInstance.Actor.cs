@@ -222,6 +222,9 @@ public sealed partial class ServerInstance
             return;
         }
 
+        if (exit.ExitCode != 0)
+            _notificationManager.SendNotification($"Server `{Key}` exited with non-success exit code: {exit.ExitCode}. Check server logs for possible causes.");
+
         _runningServer = null;
         if (_lastPing == null)
         {
@@ -235,6 +238,7 @@ public sealed partial class ServerInstance
                 _startupFailUpdateWait = true;
                 // Server keeps crashing during init, wait for an update to fix it.
                 _logger.LogWarning("{Key} is failing to start, giving up until update or manual intervention.", Key);
+                _notificationManager.SendNotification($"Server `{Key}` is failing to start, needs manual intervention or update.");
                 return;
             }
         }
@@ -353,7 +357,7 @@ public sealed partial class ServerInstance
             _logger.LogInformation("{Key} shut down with exit code {ExitCode}", Key,
                 _runningServer.ExitCode);
 
-            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber), cancel);
+            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber, _runningServer.ExitCode), cancel);
         }
         catch (OperationCanceledException)
         {
@@ -425,7 +429,7 @@ public sealed partial class ServerInstance
     /// <summary>
     /// The server has exited while being monitored.
     /// </summary>
-    private sealed record CommandServerExit(int StartNumber) : Command;
+    private sealed record CommandServerExit(int StartNumber, int ExitCode) : Command;
 
     /// <summary>
     /// The server has sent us a ping, it's still kicking!

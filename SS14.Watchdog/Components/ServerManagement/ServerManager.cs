@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.DataManagement;
+using SS14.Watchdog.Components.Notifications;
 using SS14.Watchdog.Components.ProcessManagement;
 using SS14.Watchdog.Configuration;
 
@@ -31,6 +32,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly IProcessManager _processManager;
         private readonly IServer _server;
         private readonly IHostApplicationLifetime _hostApplicationLifetime;
+        private readonly NotificationManager _notificationManager;
         private readonly IConfiguration _configuration;
         private readonly IOptionsMonitor<ServersConfiguration> _serverCfg;
         private readonly Dictionary<string, ServerInstance> _instances = new Dictionary<string, ServerInstance>();
@@ -46,7 +48,8 @@ namespace SS14.Watchdog.Components.ServerManagement
             DataManager dataManager,
             IProcessManager processManager,
             IServer server,
-            IHostApplicationLifetime hostApplicationLifetime)
+            IHostApplicationLifetime hostApplicationLifetime,
+            NotificationManager notificationManager)
         {
             _logger = logger;
             _configuration = configuration;
@@ -56,6 +59,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             _processManager = processManager;
             _server = server;
             _hostApplicationLifetime = hostApplicationLifetime;
+            _notificationManager = notificationManager;
             _serverCfg = instancesOptions;
         }
 
@@ -131,7 +135,8 @@ namespace SS14.Watchdog.Components.ServerManagement
                         _taskQueue,
                         _provider,
                         _dataManager,
-                        _processManager);
+                        _processManager,
+                        _notificationManager);
 
                 _instances.Add(key, instance);
             }
