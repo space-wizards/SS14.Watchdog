@@ -26,6 +26,8 @@ public sealed partial class ServerInstance
             SingleWriter = false
         });
 
+    private string _baseServerAddress = "";
+
     /// <summary>
     /// The last time a ping was received from the game server.
     /// </summary>
@@ -39,8 +41,10 @@ public sealed partial class ServerInstance
 
     private int _startNumber;
 
-    public async Task StartAsync(CancellationToken cancel)
+    public async Task StartAsync(string baseServerAddress, CancellationToken cancel)
     {
+        _baseServerAddress = baseServerAddress;
+
         _logger.LogDebug("Starting server {Key}", Key);
 
         await TryLoadPersistedProcess(cancel);
@@ -288,7 +292,7 @@ public sealed partial class ServerInstance
             // Watchdog comms config.
             "--cvar", $"watchdog.token={Secret}",
             "--cvar", $"watchdog.key={Key}",
-            "--cvar", $"watchdog.baseUrl={_configuration["BaseUrl"]}",
+            "--cvar", $"watchdog.baseUrl={_baseServerAddress}",
 
             "--config-file", Path.Combine(InstanceDir, "config.toml"),
             "--data-dir", Path.Combine(InstanceDir, "data"),
