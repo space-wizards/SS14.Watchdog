@@ -35,8 +35,8 @@ namespace SS14.Watchdog.Configuration
         /// <summary>
         /// How long since the last ping before we consider the server "dead" and forcefully terminate it. In seconds.
         /// </summary>
-        public int TimeoutSeconds { get; set; } = 30;
-        
+        public int TimeoutSeconds { get; set; } = 90;
+
         /// <summary>
         /// Any additional environment variables for the server process.
         /// </summary>
