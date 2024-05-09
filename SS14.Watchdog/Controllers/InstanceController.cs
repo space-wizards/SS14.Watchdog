@@ -3,7 +3,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Utility;
-using SIOFile = System.IO.File;
 
 namespace SS14.Watchdog.Controllers
 {
@@ -39,6 +38,19 @@ namespace SS14.Watchdog.Controllers
             }
 
             await instance.DoStopCommandAsync(new ServerInstanceStopCommand());
+            return Ok();
+        }
+
+        [HttpPost("shutdown")]
+        public async Task<IActionResult> Shutdown([FromHeader(Name = "Authorization")] string authorization, string key)
+        {
+            if (!TryAuthorize(authorization, key, out var failure, out var instance))
+            {
+                return failure;
+            }
+
+            await instance.DoStopCommandAsync(new ServerInstanceStopCommand());
+            await instance.ForceShutdownServerAsync();
             return Ok();
         }
 
