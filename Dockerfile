@@ -11,8 +11,8 @@ RUN apt update -y && \
     apt install -y git python3 python-is-python3
 
 COPY --from=build /build/SS14.Watchdog/bin/Release/net8.0/linux-x64/publish /watchdog
+
 WORKDIR /watchdog
-ADD ./docker/appsettings.yml .
 
 # Both TCP and UDP traffic must be explicitly exposed
 EXPOSE 1212/tcp
