@@ -17,3 +17,10 @@ docker run \
     -v /path/to/appsettings.yml:/watchdog/appsettings.yml \
     ss14-watchdog
 ```
+
+To deploy with docker compose, edit `docker-compose.yml` to your liking, supplying your own appsettings.yml if needed, then run:
+
+```sh
+docker compose build
+docker compose up -d
+```
