@@ -335,6 +335,8 @@ public sealed partial class ServerInstance
 
             "--config-file", Path.Combine(InstanceDir, "config.toml"),
             "--data-dir", Path.Combine(InstanceDir, "data"),
+
+            $"{_instanceConfig.Arguments}"
         };
         var env = new List<(string, string)>();
 
