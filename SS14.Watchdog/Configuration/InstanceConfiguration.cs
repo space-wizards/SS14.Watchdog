@@ -25,7 +25,7 @@ namespace SS14.Watchdog.Configuration
         /// <summary>
         ///     User arguments to pass to the server process.
         /// </summary>
-        public string Arguments { get; set; } = null!;
+        public List<string> Arguments { get; set; } = [];
 
         /// <summary>
         /// Make a heap dump if the server is killed due to timeout. Only supported on Linux.

@@ -335,9 +335,14 @@ public sealed partial class ServerInstance
 
             "--config-file", Path.Combine(InstanceDir, "config.toml"),
             "--data-dir", Path.Combine(InstanceDir, "data"),
-
-            $"{_instanceConfig.Arguments}"
         };
+
+        // Prepare the user provided arguments
+        foreach (var arg in _instanceConfig.Arguments)
+        {
+            args.Add(arg);
+        }
+
         var env = new List<(string, string)>();
 
         foreach (var (envVar, value) in _instanceConfig.EnvironmentVariables)
