@@ -142,6 +142,7 @@ namespace SS14.Watchdog.Components.Updates
 
         private async Task<ManifestInfo?> FetchManifestInfoAsync(CancellationToken cancel)
         {
+            _logger.LogDebug("Fetching build manifest from {ManifestUrl}...", _manifestUrl);
             try
             {
                 using var resp = await _httpClient.SendAsync(MakeAuthenticatedGet(_manifestUrl), cancel);
