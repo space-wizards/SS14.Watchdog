@@ -1,18 +1,18 @@
 Serilog:
   Using: [ "Serilog.Sinks.Console", "Serilog.Sinks.Loki" ]
-  MinimumLevel: 
+  MinimumLevel:
     Default: Information
     Override:
       SS14: Verbose
       Microsoft: Warning
       Microsoft.Hosting.Lifetime: "Information"
-      
+
   WriteTo:
     - Name: Console
       Args:
         Theme: "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console"
         OutputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}"
-        
+
   Enrich: [ "FromLogContext" ]
 
   #Loki:
@@ -57,5 +57,5 @@ Servers:
       #  JobName: "SS14 Content"
       UpdateType: "Manifest"
       Updates:
-        ManifestUrl: "https://central.spacestation14.io/builds/wizards/manifest.json"
+        ManifestUrl: "https://wizards.cdn.spacestation14.com/fork/wizards/manifest"
       TimeoutSeconds: 90
