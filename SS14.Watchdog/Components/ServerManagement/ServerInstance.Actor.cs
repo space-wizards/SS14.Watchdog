@@ -416,16 +416,36 @@ public sealed partial class ServerInstance
         if (_updateProvider == null)
             return;
 
-        var hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision, cancel);
-        _logger.LogDebug("Update available: {available}.", hasUpdate);
+        bool hasUpdate;
+        try
+        {
+            _logger.LogTrace("Checking for update...");
+            hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision, cancel);
+            _logger.LogDebug("Update available: {available}.", hasUpdate);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error while checking for update!");
+            return;
+        }
 
         if (!hasUpdate)
             return;
 
-        var newRevision = await _updateProvider.RunUpdateAsync(
-            _currentRevision,
-            Path.Combine(InstanceDir, "bin"),
-            cancel);
+        _logger.LogTrace("Starting update...");
+        string? newRevision;
+        try
+        {
+            newRevision = await _updateProvider.RunUpdateAsync(
+                _currentRevision,
+                Path.Combine(InstanceDir, "bin"),
+                cancel);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Uncaught error while updating server");
+            return;
+        }
 
         if (newRevision != null)
         {

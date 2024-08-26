@@ -90,33 +90,36 @@ namespace SS14.Watchdog.Components.Updates
 
             _logger.LogTrace("Downloading server binary from {Download} to {TempFile}", downloadUrl, tempFile.Name);
 
-            // Download to file...
-            var timeout = Task.Delay(TimeSpan.FromSeconds(DownloadTimeoutSeconds), cancel);
-            var downloadTask = Task.Run(async () =>
+            var timeoutTcs = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+            timeoutTcs.CancelAfter(TimeSpan.FromSeconds(DownloadTimeoutSeconds));
+
+            try
             {
                 using var resp = await _httpClient.SendAsync(
                     MakeAuthenticatedGet(downloadUrl),
                     HttpCompletionOption.ResponseHeadersRead,
-                    cancel);
+                    timeoutTcs.Token);
+
+                _logger.LogTrace("Received HTTP response, starting download");
 
                 resp.EnsureSuccessStatusCode();
 
-                await resp.Content.CopyToAsync(tempFile, cancel);
-            }, cancel);
+                await resp.Content.CopyToAsync(tempFile, timeoutTcs.Token);
 
-            if (await Task.WhenAny(downloadTask, timeout) == timeout)
+                _logger.LogTrace("Update file downloaded to disk");
+            }
+            catch (OperationCanceledException)
             {
-                await timeout; // Throws cancellation if cancellation requested.
                 _logger.LogError("Timeout while downloading: {Timeout} seconds", DownloadTimeoutSeconds);
-                return null;
+                throw;
             }
 
-            await downloadTask;
+            // Download to file...
 
             // Verify hash because why not?
-            using var hash = SHA256.Create();
+            _logger.LogTrace("Verifying hash of download file...");
             tempFile.Seek(0, SeekOrigin.Begin);
-            var hashOutput = await hash.ComputeHashAsync(tempFile, cancel);
+            var hashOutput = await SHA256.HashDataAsync(tempFile, cancel);
 
             if (!downloadHash.AsSpan().SequenceEqual(hashOutput))
             {
