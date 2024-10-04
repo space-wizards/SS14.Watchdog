@@ -11,6 +11,7 @@ using Microsoft.Extensions.Hosting;
 using Serilog;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.DataManagement;
+using SS14.Watchdog.Components.Notifications;
 using SS14.Watchdog.Components.ProcessManagement;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Configuration;
@@ -31,6 +32,7 @@ namespace SS14.Watchdog
         public void ConfigureServices(IServiceCollection services)
         {
             services.Configure<DataOptions>(Configuration.GetSection(DataOptions.Position));
+            services.Configure<NotificationOptions>(Configuration.GetSection(NotificationOptions.Position));
             services.Configure<ServersConfiguration>(Configuration.GetSection("Servers"));
 
             services.AddSingleton<DataManager>();
@@ -63,6 +65,10 @@ namespace SS14.Watchdog
             services.AddSingleton<BackgroundTaskQueue>();
             services.AddSingleton<IBackgroundTaskQueue>(p => p.GetService<BackgroundTaskQueue>()!);
             services.AddHostedService(p => p.GetService<BackgroundTaskQueue>()!);
+
+            services.AddSingleton<NotificationManager>();
+
+            services.AddHttpClient(NotificationManager.DiscordHttpClient);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

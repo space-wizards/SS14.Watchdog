@@ -23,6 +23,11 @@ namespace SS14.Watchdog.Configuration
             : "bin/Robust.Server";
 
         /// <summary>
+        ///     User arguments to pass to the server process.
+        /// </summary>
+        public List<string> Arguments { get; set; } = [];
+
+        /// <summary>
         /// Make a heap dump if the server is killed due to timeout. Only supported on Linux.
         /// </summary>
         public bool DumpOnTimeout { get; set; } = true;
@@ -35,8 +40,8 @@ namespace SS14.Watchdog.Configuration
         /// <summary>
         /// How long since the last ping before we consider the server "dead" and forcefully terminate it. In seconds.
         /// </summary>
-        public int TimeoutSeconds { get; set; } = 30;
-        
+        public int TimeoutSeconds { get; set; } = 90;
+
         /// <summary>
         /// Any additional environment variables for the server process.
         /// </summary>

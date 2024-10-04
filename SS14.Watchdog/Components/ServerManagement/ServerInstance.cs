@@ -13,6 +13,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.DataManagement;
+using SS14.Watchdog.Components.Notifications;
 using SS14.Watchdog.Components.ProcessManagement;
 using SS14.Watchdog.Components.Updates;
 using SS14.Watchdog.Configuration;
@@ -51,6 +52,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         private readonly IBackgroundTaskQueue _taskQueue;
         private readonly DataManager _dataManager;
         private readonly IProcessManager _processManager;
+        private readonly NotificationManager _notificationManager;
 
         private string? _currentRevision;
         private bool _updateOnRestart = true;
@@ -61,8 +63,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         private IProcessHandle? _runningServer;
 
-        public ServerInstance(
-            string key,
+        public ServerInstance(string key,
             InstanceConfiguration instanceConfig,
             IConfiguration configuration,
             ServersConfiguration serversConfiguration,
@@ -70,7 +71,8 @@ namespace SS14.Watchdog.Components.ServerManagement
             IBackgroundTaskQueue taskQueue,
             IServiceProvider serviceProvider,
             DataManager dataManager,
-            IProcessManager processManager)
+            IProcessManager processManager,
+            NotificationManager notificationManager)
         {
             Key = key;
             _instanceConfig = instanceConfig;
@@ -80,6 +82,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             _taskQueue = taskQueue;
             _dataManager = dataManager;
             _processManager = processManager;
+            _notificationManager = notificationManager;
 
             if (!string.IsNullOrEmpty(_instanceConfig.ApiTokenFile))
             {
@@ -290,6 +293,8 @@ namespace SS14.Watchdog.Components.ServerManagement
             if (_runningServer == null)
                 return;
 
+            _notificationManager.SendNotification($"Server `{Key}` timed and will be killed. Check server logs for possible causes.");
+
             if (_instanceConfig.DumpOnTimeout)
             {
                 if (!OperatingSystem.IsWindows())
@@ -356,6 +361,11 @@ namespace SS14.Watchdog.Components.ServerManagement
             await _commandQueue.Writer.WriteAsync(new CommandRestart(), cancel);
         }
 
+        public async Task DoStopCommandAsync(ServerInstanceStopCommand stopCommand, CancellationToken cancel = default)
+        {
+            await _commandQueue.Writer.WriteAsync(new CommandStop(stopCommand), cancel);
+        }
+
         public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
         {
             var proc = _runningServer;
@@ -397,7 +407,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("{Key} did not gracefully shut down in time, killing");
+                _logger.LogInformation("{Key} did not gracefully shut down in time, killing", Key);
                 await proc.Kill();
                 return;
             }

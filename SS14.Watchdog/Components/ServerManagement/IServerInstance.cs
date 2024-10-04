@@ -61,5 +61,30 @@ namespace SS14.Watchdog.Components.ServerManagement
 
         Task ForceShutdownServerAsync(CancellationToken cancel = default);
         Task DoRestartCommandAsync(CancellationToken cancel = default);
+
+        /// <summary>
+        /// Instruct that the server instance should be stopped gracefully.
+        /// It will not be restarted automatically after shutdown.
+        /// </summary>
+        /// <remarks>
+        /// The server will be asked to gracefully shut down via the <c>/update</c> end point.
+        /// </remarks>
+        Task DoStopCommandAsync(ServerInstanceStopCommand stopCommand, CancellationToken cancel = default);
+    }
+
+    /// <summary>
+    /// Information about a stop command sent to a server instance.
+    /// </summary>
+    /// <seealso cref="IServerInstance.DoStopCommandAsync"/>
+    public sealed class ServerInstanceStopCommand
+    {
+        public ServerInstanceStopReason StopReason;
+    }
+
+    /// <seealso cref="ServerInstanceStopCommand"/>
+    public enum ServerInstanceStopReason
+    {
+        Unknown,
+        Maintenance,
     }
 }

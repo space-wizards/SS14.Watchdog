@@ -26,6 +26,8 @@ public sealed partial class ServerInstance
             SingleWriter = false
         });
 
+    private string _baseServerAddress = "";
+
     /// <summary>
     /// The last time a ping was received from the game server.
     /// </summary>
@@ -38,9 +40,13 @@ public sealed partial class ServerInstance
     private int _serverTimeoutNumber;
 
     private int _startNumber;
+    // Server got an explicit stop command, will not be automatically restarted.
+    private bool _stopped;
 
-    public async Task StartAsync(CancellationToken cancel)
+    public async Task StartAsync(string baseServerAddress, CancellationToken cancel)
     {
+        _baseServerAddress = baseServerAddress;
+
         _logger.LogDebug("Starting server {Key}", Key);
 
         await TryLoadPersistedProcess(cancel);
@@ -131,6 +137,9 @@ public sealed partial class ServerInstance
             case CommandRestart:
                 await RunCommandRestart(cancel);
                 break;
+            case CommandStop stop:
+                await RunCommandStop(stop.StopCommand, cancel);
+                break;
             case CommandServerPing ping:
                 await RunCommandServerPing(ping, cancel);
                 break;
@@ -147,6 +156,12 @@ public sealed partial class ServerInstance
 
     private async Task RunCommandRestart(CancellationToken cancel)
     {
+        if (_stopped)
+        {
+            _logger.LogDebug("Clearing stopped flag due to manual server restart");
+            _stopped = false;
+        }
+
         if (_runningServer == null)
         {
             _loadFailCount = 0;
@@ -158,6 +173,18 @@ public sealed partial class ServerInstance
         await ForceShutdownServerAsync(cancel);
     }
 
+    private async Task RunCommandStop(ServerInstanceStopCommand stopCommand, CancellationToken cancel)
+    {
+        // TODO: use stopCommand to indicate more extensive error message to error.
+
+        _stopped = true;
+        if (IsRunning)
+        {
+            _logger.LogTrace("Server is running, sending fake update notification to make it stop");
+            await SendUpdateNotificationAsync(cancel);
+        }
+    }
+
     private async Task RunCommandUpdateAvailable(CommandUpdateAvailable command, CancellationToken cancel)
     {
         _updateOnRestart = command.UpdateAvailable;
@@ -167,6 +194,10 @@ public sealed partial class ServerInstance
             {
                 _logger.LogTrace("Server is running, sending update notification.");
                 await SendUpdateNotificationAsync(cancel);
+            }
+            else if (_stopped)
+            {
+                _logger.LogInformation("Not restarting server for update as it was manually stopped.");
             }
             else if (_startupFailUpdateWait)
             {
@@ -219,6 +250,9 @@ public sealed partial class ServerInstance
             return;
         }
 
+        if (exit.ExitCode != 0)
+            _notificationManager.SendNotification($"Server `{Key}` exited with non-success exit code: {exit.ExitCode}. Check server logs for possible causes.");
+
         _runningServer = null;
         if (_lastPing == null)
         {
@@ -232,6 +266,7 @@ public sealed partial class ServerInstance
                 _startupFailUpdateWait = true;
                 // Server keeps crashing during init, wait for an update to fix it.
                 _logger.LogWarning("{Key} is failing to start, giving up until update or manual intervention.", Key);
+                _notificationManager.SendNotification($"Server `{Key}` is failing to start, needs manual intervention or update.");
                 return;
             }
         }
@@ -240,8 +275,16 @@ public sealed partial class ServerInstance
             _loadFailCount = 0;
         }
 
-        _logger.LogInformation("{Key}: Restarting server after exit...", Key);
-        await StartServer(cancel);
+        if (!_stopped)
+        {
+            _logger.LogInformation("{Key}: Restarting server after exit...", Key);
+            await StartServer(cancel);
+        }
+        else
+        {
+            _logger.LogInformation("{Key}: Not restarting server as it was manually stopped.", Key);
+            _notificationManager.SendNotification($"Server `{Key}` has exited after manual stop request.");
+        }
     }
 
     private async Task RunCommandStart(CancellationToken cancel)
@@ -289,11 +332,18 @@ public sealed partial class ServerInstance
             // Watchdog comms config.
             "--cvar", $"watchdog.token={Secret}",
             "--cvar", $"watchdog.key={Key}",
-            "--cvar", $"watchdog.baseUrl={_configuration["BaseUrl"]}",
+            "--cvar", $"watchdog.baseUrl={_baseServerAddress}",
 
             "--config-file", Path.Combine(InstanceDir, "config.toml"),
             "--data-dir", Path.Combine(InstanceDir, "data"),
         };
+
+        // Prepare the user provided arguments
+        foreach (var arg in _instanceConfig.Arguments)
+        {
+            args.Add(arg);
+        }
+
         var env = new List<(string, string)>();
 
         foreach (var (envVar, value) in _instanceConfig.EnvironmentVariables)
@@ -351,7 +401,7 @@ public sealed partial class ServerInstance
 
             _logger.LogInformation("{Key} shut down with status {ExitStatus}", Key, exitStatus);
 
-            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber), cancel);
+            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber, _runningServer.ExitCode), cancel);
         }
         catch (OperationCanceledException)
         {
@@ -368,16 +418,36 @@ public sealed partial class ServerInstance
         if (_updateProvider == null)
             return;
 
-        var hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision, cancel);
-        _logger.LogDebug("Update available: {available}.", hasUpdate);
+        bool hasUpdate;
+        try
+        {
+            _logger.LogTrace("Checking for update...");
+            hasUpdate = await _updateProvider.CheckForUpdateAsync(_currentRevision, cancel);
+            _logger.LogDebug("Update available: {available}.", hasUpdate);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Error while checking for update!");
+            return;
+        }
 
         if (!hasUpdate)
             return;
 
-        var newRevision = await _updateProvider.RunUpdateAsync(
-            _currentRevision,
-            Path.Combine(InstanceDir, "bin"),
-            cancel);
+        _logger.LogTrace("Starting update...");
+        string? newRevision;
+        try
+        {
+            newRevision = await _updateProvider.RunUpdateAsync(
+                _currentRevision,
+                Path.Combine(InstanceDir, "bin"),
+                cancel);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Uncaught error while updating server");
+            return;
+        }
 
         if (newRevision != null)
         {
@@ -416,6 +486,11 @@ public sealed partial class ServerInstance
     private sealed record CommandRestart : Command;
 
     /// <summary>
+    /// Command to stop the server gracefully, without restarting it afterwards.
+    /// </summary>
+    private sealed record CommandStop(ServerInstanceStopCommand StopCommand) : Command;
+
+    /// <summary>
     /// The server has failed to ping back in time, grab the axe!
     /// </summary>
     private sealed record CommandTimedOut(int TimeoutCounter) : Command;
@@ -423,7 +498,7 @@ public sealed partial class ServerInstance
     /// <summary>
     /// The server has exited while being monitored.
     /// </summary>
-    private sealed record CommandServerExit(int StartNumber) : Command;
+    private sealed record CommandServerExit(int StartNumber, int ExitCode) : Command;
 
     /// <summary>
     /// The server has sent us a ping, it's still kicking!

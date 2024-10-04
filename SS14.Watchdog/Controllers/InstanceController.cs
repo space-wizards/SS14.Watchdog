@@ -30,6 +30,18 @@ namespace SS14.Watchdog.Controllers
             return Ok();
         }
 
+        [HttpPost("stop")]
+        public async Task<IActionResult> Stop([FromHeader(Name = "Authorization")] string authorization, string key)
+        {
+            if (!TryAuthorize(authorization, key, out var failure, out var instance))
+            {
+                return failure;
+            }
+
+            await instance.DoStopCommandAsync(new ServerInstanceStopCommand());
+            return Ok();
+        }
+
         [HttpPost("update")]
         public IActionResult Update([FromHeader(Name = "Authorization")] string authorization, string key)
         {
