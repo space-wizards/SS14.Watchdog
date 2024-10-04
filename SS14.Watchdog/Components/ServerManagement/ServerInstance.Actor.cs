@@ -378,6 +378,7 @@ public sealed partial class ServerInstance
         }
 
         MonitorServer(_startNumber, cancel);
+        StartTimeoutTimer();
     }
 
     private string GetProgramPath()
