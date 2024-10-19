@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Channels;
@@ -250,8 +251,8 @@ public sealed partial class ServerInstance
             return;
         }
 
-        if (exit.ExitCode != 0)
-            _notificationManager.SendNotification($"Server `{Key}` exited with non-success exit code: {exit.ExitCode}. Check server logs for possible causes.");
+        if (!exit.ExitStatus.IsClean)
+            _notificationManager.SendNotification($"Server `{Key}` exited with non-clean exit status: {exit.ExitStatus}. Check server logs for possible causes.");
 
         _runningServer = null;
         if (_lastPing == null)
@@ -401,7 +402,9 @@ public sealed partial class ServerInstance
 
             _logger.LogInformation("{Key} shut down with status {ExitStatus}", Key, exitStatus);
 
-            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber, _runningServer.ExitCode), cancel);
+            Debug.Assert(exitStatus != null);
+
+            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber, exitStatus), cancel);
         }
         catch (OperationCanceledException)
         {
@@ -498,7 +501,7 @@ public sealed partial class ServerInstance
     /// <summary>
     /// The server has exited while being monitored.
     /// </summary>
-    private sealed record CommandServerExit(int StartNumber, int ExitCode) : Command;
+    private sealed record CommandServerExit(int StartNumber, ProcessExitStatus ExitStatus) : Command;
 
     /// <summary>
     /// The server has sent us a ping, it's still kicking!

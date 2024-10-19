@@ -68,7 +68,9 @@ public sealed record ProcessExitStatus(ProcessExitReason Reason, int Status)
     {
     }
 
-    public bool IsClean => Reason == ProcessExitReason.ExitCode && Status == 0 || Reason == ProcessExitReason.Success;
+    public bool IsClean => Reason == ProcessExitReason.ReasonUnavailable
+                           || Reason == ProcessExitReason.ExitCode && Status == 0
+                           || Reason == ProcessExitReason.Success;
 }
 
 /// <summary>
@@ -78,6 +80,17 @@ public enum ProcessExitReason
 {
     // These somewhat correspond to systemd's values for "Result" on a Service, kinda.
     // https://www.freedesktop.org/software/systemd/man/org.freedesktop.systemd1.html#Properties2
+
+    /// <summary>
+    /// Exit reason could not be determined.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This happens on POSIX with the "basic" process manager after restarting the watchdog,
+    /// as it is not possible to get the exit status of persisted processes.
+    /// </para>
+    /// </remarks>
+    ReasonUnavailable,
 
     /// <summary>
     /// Process exited "successfully" according to systemd.
