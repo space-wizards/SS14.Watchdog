@@ -329,9 +329,10 @@ public sealed partial class ServerInstance
         var args = new List<string>
         {
             // Watchdog comms config.
-            "--cvar", $"watchdog.token={Secret}",
             "--cvar", $"watchdog.key={Key}",
             "--cvar", $"watchdog.baseUrl={_baseServerAddress}",
+            // watchdog.token provided through ENV vars, as this does not show up in process listings
+            // like `ps -aux` or `htop`.
 
             "--config-file", Path.Combine(InstanceDir, "config.toml"),
             "--data-dir", Path.Combine(InstanceDir, "data"),
@@ -343,7 +344,11 @@ public sealed partial class ServerInstance
             args.Add(arg);
         }
 
-        var env = new List<(string, string)>();
+        var env = new List<(string, string)>
+        {
+            // __ is replaced by a . when parsing CVars from an environment variable.
+            ("ROBUST_CVAR_watchdog__token", $"{Secret}")
+        };
 
         foreach (var (envVar, value) in _instanceConfig.EnvironmentVariables)
         {
