@@ -47,6 +47,11 @@ namespace SS14.Watchdog
                     services.Configure<ProcessOptions>(processSection);
                     services.AddSingleton<IProcessManager, ProcessManagerBasic>();
                     break;
+                case ProcessMode.Systemd:
+                    services.Configure<SystemdProcessOptions>(processSection);
+                    services.AddSingleton<IProcessManager, ProcessManagerSystemd>();
+                    services.AddHostedService(p => (ProcessManagerSystemd) p.GetService<IProcessManager>()!);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException($"Invalid process mode: {processOptions.Mode}");
             }

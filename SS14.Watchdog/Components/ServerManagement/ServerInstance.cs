@@ -234,14 +234,22 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             if (IsRunning)
             {
-                _logger.LogInformation("Shutting down running server {Key}", Key);
-                await ForceShutdownServerAsync();
+                if (_processManager.CanPersist)
+                {
+                    _logger.LogInformation("Not shutting down {Key}, persisting running server", Key);
+                }
+                else
+                {
+                    _logger.LogInformation("Shutting down running server {Key}", Key);
+                    await ForceShutdownServerAsync();
+                }
             }
         }
 
-        public void ForceShutdown()
+        public async Task ForceShutdown()
         {
-            _runningServer?.Kill();
+            if (_runningServer != null)
+                await _runningServer.Kill();
         }
 
         public async Task PingReceived()
@@ -265,7 +273,7 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             try
             {
-                _logger.LogTrace("Timeout timer started");
+                _logger.LogTrace("Timeout timer {Number} started", number);
                 await Task.Delay(PingTimeoutDelay, token);
 
                 // ReSharper disable once MethodSupportsCancellation
@@ -274,11 +282,11 @@ namespace SS14.Watchdog.Components.ServerManagement
             catch (OperationCanceledException)
             {
                 // It still lives.
-                _logger.LogTrace("Timeout broken, it lives.");
+                _logger.LogTrace("Timeout {Number} broken, it lives.", number);
             }
         }
 
-        private void TimeoutKill()
+        private async Task TimeoutKill()
         {
             _logger.LogWarning("{Key}: timed out, killing", Key);
 
@@ -317,7 +325,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                 _logger.LogInformation("{Key}: killing process...", Key);
             }
 
-            _runningServer.Kill();
+            await _runningServer.Kill();
 
             // Monitor will notice server died and pick it up.
         }
@@ -361,7 +369,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
         {
             var proc = _runningServer;
-            if (proc == null || proc.HasExited)
+            if (proc == null || await proc.GetExitStatusAsync() != null)
             {
                 return;
             }
@@ -376,13 +384,13 @@ namespace SS14.Watchdog.Components.ServerManagement
             catch (HttpRequestException e)
             {
                 _logger.LogInformation(e, "Exception sending shutdown notification to server. Killing.");
-                proc.Kill();
+                await proc.Kill();
                 return;
             }
             catch (OperationCanceledException)
             {
                 _logger.LogInformation("Timeout sending shutdown notification to server. Killing.");
-                proc.Kill();
+                await proc.Kill();
                 return;
             }
 
@@ -391,17 +399,20 @@ namespace SS14.Watchdog.Components.ServerManagement
             // Give it 5 seconds to shut down.
             var waitCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
             waitCts.CancelAfter(5000);
+            ProcessExitStatus? status;
             try
             {
                 await proc.WaitForExitAsync(cancel);
+                status = await proc.GetExitStatusAsync();
             }
             catch (OperationCanceledException)
             {
                 _logger.LogInformation("{Key} did not gracefully shut down in time, killing", Key);
-                proc.Kill();
+                await proc.Kill();
+                return;
             }
 
-            _logger.LogInformation("{Key} shut down gracefully", Key);
+            _logger.LogInformation("{Key} shut down gracefully ({Status})", Key, status);
         }
 
         public async Task SendShutdownNotificationAsync(CancellationToken cancel = default)
