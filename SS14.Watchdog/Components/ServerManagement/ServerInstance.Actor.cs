@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Channels;
@@ -109,6 +110,7 @@ public sealed partial class ServerInstance
         SetToken(token);
 
         MonitorServer(++_startNumber, cancel);
+        StartTimeoutTimer();
     }
 
     private async Task CommandLoop(CancellationToken cancel)
@@ -207,7 +209,7 @@ public sealed partial class ServerInstance
         }
     }
 
-    private Task RunCommandTimedOut(CommandTimedOut timedOut, CancellationToken cancel)
+    private async Task RunCommandTimedOut(CommandTimedOut timedOut, CancellationToken cancel)
     {
         if (timedOut.TimeoutCounter != _serverTimeoutNumber)
         {
@@ -216,11 +218,11 @@ public sealed partial class ServerInstance
             // Guard against race condition: the timeout could happen just before we can cancel it
             // (due to ping, server shutdown, etc).
             // We use the sequence number to avoid letting it go through in that case.
-            return Task.CompletedTask;
+            return;
         }
 
-        TimeoutKill();
-        return Task.CompletedTask;
+        await TimeoutKill();
+        return;
     }
 
     private Task RunCommandServerPing(CommandServerPing ping, CancellationToken cancel)
@@ -249,8 +251,8 @@ public sealed partial class ServerInstance
             return;
         }
 
-        if (exit.ExitCode != 0)
-            _notificationManager.SendNotification($"Server `{Key}` exited with non-success exit code: {exit.ExitCode}. Check server logs for possible causes.");
+        if (!exit.ExitStatus.IsClean)
+            _notificationManager.SendNotification($"Server `{Key}` exited with non-clean exit status: {exit.ExitStatus}. Check server logs for possible causes.");
 
         _runningServer = null;
         if (_lastPing == null)
@@ -401,11 +403,13 @@ public sealed partial class ServerInstance
         try
         {
             await _runningServer.WaitForExitAsync(cancel);
+            var exitStatus = await _runningServer.GetExitStatusAsync();
 
-            _logger.LogInformation("{Key} shut down with exit code {ExitCode}", Key,
-                _runningServer.ExitCode);
+            _logger.LogInformation("{Key} shut down with status {ExitStatus}", Key, exitStatus);
 
-            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber, _runningServer.ExitCode), cancel);
+            Debug.Assert(exitStatus != null);
+
+            await _commandQueue.Writer.WriteAsync(new CommandServerExit(startNumber, exitStatus), cancel);
         }
         catch (OperationCanceledException)
         {
@@ -502,7 +506,7 @@ public sealed partial class ServerInstance
     /// <summary>
     /// The server has exited while being monitored.
     /// </summary>
-    private sealed record CommandServerExit(int StartNumber, int ExitCode) : Command;
+    private sealed record CommandServerExit(int StartNumber, ProcessExitStatus ExitStatus) : Command;
 
     /// <summary>
     /// The server has sent us a ping, it's still kicking!

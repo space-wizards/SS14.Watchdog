@@ -88,7 +88,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             // Start server instances in background while main host loads.
             foreach (var instance in _instances.Values)
             {
-                tasks.Add(instance.StartAsync(baseAddress, stoppingToken));
+                tasks.Add(Task.Run(() => instance.StartAsync(baseAddress, stoppingToken), default));
             }
 
             await Task.WhenAll(tasks);
@@ -168,7 +168,7 @@ namespace SS14.Watchdog.Components.ServerManagement
                 // At least try to kill the server processes I guess (if necessary).
                 foreach (var instance in _instances.Values)
                 {
-                    instance.ForceShutdown();
+                    await instance.ForceShutdown();
                 }
             }
         }

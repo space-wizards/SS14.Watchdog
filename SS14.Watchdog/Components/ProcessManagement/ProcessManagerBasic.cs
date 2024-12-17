@@ -161,15 +161,13 @@ public sealed class ProcessManagerBasic : IProcessManager
 
         _logger.LogDebug("Process looks good, guess we're using this!");
 
-        return Task.FromResult<IProcessHandle?>(new Handle(process));
+        return Task.FromResult<IProcessHandle?>(new Handle(process) { IsRecovered = true });
     }
 
     private sealed class Handle : IProcessHandle
     {
         private readonly Process _process;
-
-        public bool HasExited => _process.HasExited;
-        public int ExitCode => _process.ExitCode;
+        public bool IsRecovered;
 
         public Handle(Process process)
         {
@@ -187,9 +185,27 @@ public sealed class ProcessManagerBasic : IProcessManager
             await _process.WaitForExitAsync(cancel);
         }
 
-        public void Kill()
+        public Task<ProcessExitStatus?> GetExitStatusAsync()
+        {
+            if (!_process.HasExited)
+                return Task.FromResult<ProcessExitStatus?>(null);
+
+            // POSIX makes it impossible to fetch the exit code for processes that aren't our immediate children.
+            // This means we cannot tell what the exit code is if the process
+            // was started by a previous watchdog instance, and we "recovered" it from persistence.
+            // Windows does not have this issue. Microsoft wins again.
+            var processExitStatus = !OperatingSystem.IsWindows() && IsRecovered
+                ? new ProcessExitStatus(ProcessExitReason.ReasonUnavailable)
+                : new ProcessExitStatus(ProcessExitReason.ExitCode, _process.ExitCode);
+
+            return Task.FromResult<ProcessExitStatus?>(processExitStatus);
+        }
+
+        public Task Kill()
         {
             _process.Kill(entireProcessTree: true);
+
+            return Task.CompletedTask;
         }
     }
 }
