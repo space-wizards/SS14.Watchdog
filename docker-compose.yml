@@ -1,0 +1,18 @@
+services:
+  ss14-watchdog:
+    build: .
+    image: ss14-watchdog
+    restart: always
+    ports:
+      - 8080:8080/tcp
+      - 1212:1212/tcp
+      - 1212:1212/udp
+    volumes:
+      - instances:/watchdog/instances/
+      # # Uncomment to supply your own appsettings.yml
+      # - type: bind
+      #   source: /tmp/appsettings.yml
+      #   target: /watchdog/appsettings.yml
+
+volumes:
+  instances:
