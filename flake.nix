@@ -2,7 +2,7 @@
   description =
     "Flake providing a package and NixOS module for the Space Station 14 Watchdog.";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-23.05";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
 
   outputs = { self, nixpkgs }:
     let
