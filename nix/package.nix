@@ -2,7 +2,7 @@
 let
   rev = flake.rev or "dirty";
   dotnet-sdk = with dotnetCorePackages;
-    combinePackages [ sdk_8_0 aspnetcore_8_0 ];
+    combinePackages [ sdk_9_0 aspnetcore_9_0 ];
   watchdog = buildDotnetModule {
     inherit dotnet-sdk;
     name = "space-station-14-watchdog-${rev}";
@@ -20,7 +20,7 @@ let
     runtimeDeps = [ git python3 zstd ];
 
     dotnet-runtime = with dotnetCorePackages;
-      combinePackages [ runtime_8_0 aspnetcore_8_0 ];
+      combinePackages [ runtime_9_0 aspnetcore_9_0 ];
 
     executables = [ "SS14.Watchdog" ];
   };
