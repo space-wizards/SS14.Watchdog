@@ -47,7 +47,7 @@ in
 
       package = mkOption {
         type = types.package;
-        default = flake.packages.${config.nixpkgs.system}.space-station-14-watchdog;
+        default = flake.packages.${pkgs.stdenv.hostPlatform}.space-station-14-watchdog;
         description = lib.mkDoc ''
           The package to use.
         '';
