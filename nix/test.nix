@@ -10,7 +10,7 @@
           ApiPort = 1212;
           TimeoutSeconds = 240;
           UpdateType = "Manifest";
-          Updates.ManifestUrl = "https://central.spacestation14.io/builds/wizards/manifest.json";
+          Updates.ManifestUrl = "https://wizards.cdn.spacestation14.com/fork/wizards/manifest";
         };
         instances.Test.configuration = {
           status = {
