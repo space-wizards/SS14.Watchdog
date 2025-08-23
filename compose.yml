@@ -1,0 +1,14 @@
+services:
+  watchdog:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ss14-watchdog
+    ports:
+      - "5000:5000" # Example port for the Watchdog API
+      - "1212:1212/tcp" # Example port for the game server API (TCP)
+      - "1212:1212/udp" # Example port for the game server API (UDP)
+    restart: unless-stopped
+    volumes:
+      - ./instances:/watchdog/instances
+      - ./SS14.Watchdog/appsettings.yml:/watchdog/appsettings.yml
