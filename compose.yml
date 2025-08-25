@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: ss14-watchdog
+    environment:
+      - ASPNETCORE_URLS=http://localhost:5000 # Override the ASP.NET Core default URL
     ports:
       - "5000:5000" # Example port for the Watchdog API
       - "1212:1212/tcp" # Example port for the game server API (TCP)
