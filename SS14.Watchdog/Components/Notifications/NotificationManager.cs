@@ -2,6 +2,7 @@
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -103,7 +104,9 @@ public sealed partial class NotificationManager(
 
         if (!string.IsNullOrWhiteSpace(optionsValue.UpdatePostToken))
         {
-            var authHeader = new AuthenticationHeaderValue("WatchdogToken", optionsValue.UpdatePostToken);
+            var tokenAsBytes = Encoding.ASCII.GetBytes(optionsValue.UpdatePostToken);
+            var tokenAsBase64 = Convert.ToBase64String(tokenAsBytes);
+            var authHeader = new AuthenticationHeaderValue("Basic", tokenAsBase64);
             request.Headers.Authorization = authHeader;
         }
 
