@@ -102,7 +102,8 @@ public sealed partial class NotificationManager(
     {
         using var request = new HttpRequestMessage(HttpMethod.Post, url);
 
-        if (!string.IsNullOrWhiteSpace(optionsValue.UpdatePostToken))
+        if (!string.IsNullOrWhiteSpace(optionsValue.UpdatePostUser)
+            && !string.IsNullOrWhiteSpace(optionsValue.UpdatePostToken))
         {
             var authAsBytes = Encoding.ASCII.GetBytes(optionsValue.UpdatePostUser + ":"  + optionsValue.UpdatePostToken);
             var authAsBase64 = Convert.ToBase64String(authAsBytes);
