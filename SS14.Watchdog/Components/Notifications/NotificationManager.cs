@@ -104,9 +104,9 @@ public sealed partial class NotificationManager(
 
         if (!string.IsNullOrWhiteSpace(optionsValue.UpdatePostToken))
         {
-            var tokenAsBytes = Encoding.ASCII.GetBytes(optionsValue.UpdatePostToken);
-            var tokenAsBase64 = Convert.ToBase64String(tokenAsBytes);
-            var authHeader = new AuthenticationHeaderValue("Basic", tokenAsBase64);
+            var authAsBytes = Encoding.ASCII.GetBytes(optionsValue.UpdatePostUser + ":"  + optionsValue.UpdatePostToken);
+            var authAsBase64 = Convert.ToBase64String(authAsBytes);
+            var authHeader = new AuthenticationHeaderValue("Basic", authAsBase64);
             request.Headers.Authorization = authHeader;
         }
 

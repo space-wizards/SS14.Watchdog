@@ -23,6 +23,11 @@ public sealed class NotificationOptions
     public List<string> NotifyUrls { get; set; } = [];
 
     /// <summary>
+    ///     The username that will be passed through to each update URL as BasicAuthentication.
+    /// </summary>
+    public string UpdatePostUser { get; set; } = string.Empty;
+
+    /// <summary>
     ///     The token that will be passed through to each update URL as BasicAuthentication.
     /// </summary>
     public string UpdatePostToken { get; set; } = string.Empty;
