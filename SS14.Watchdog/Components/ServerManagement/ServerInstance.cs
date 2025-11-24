@@ -336,6 +336,10 @@ namespace SS14.Watchdog.Components.ServerManagement
                 return;
 
             _logger.LogDebug("Received update notification.");
+
+            // Should send an update regardless of what the server's state is.
+            _notificationManager.SendHttpNotification(Key);
+
             _taskQueue.QueueTask(async cancel =>
             {
                 var updateAvailable = await _updateProvider.CheckForUpdateAsync(_currentRevision, cancel);

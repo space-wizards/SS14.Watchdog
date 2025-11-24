@@ -36,7 +36,7 @@ public sealed partial class NotificationManager(
         SendWebhook(optionsValue, message);
     }
 
-    public async Task SendHttpNotification(string instanceId)
+    public async void SendHttpNotification(string instanceId)
     {
         var optionsValue = options.Value;
 
