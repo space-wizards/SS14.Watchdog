@@ -41,7 +41,7 @@ jobs:
 
   docker_build_by_depot_phase:
     runs-on: ubuntu-latest
-    name: depot puild-push to ghcr
+    name: depot build-push to ghcr
     needs: [parse_phase]
     permissions:
       id-token: write
