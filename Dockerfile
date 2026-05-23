@@ -71,6 +71,7 @@ COPY --from=build /usr/share/zoneinfo/Etc/UTC /etc/localtime
 COPY --from=build /usr/sources/ss14.watchdog/dist/ ./
 
 RUN busybox rm -vf appsettings.yml \
+  && busybox mkdir -m0500 -p /data/ss14/configs \
   && busybox ln -s /data/ss14/instances instances \
   && busybox ln -s /data/ss14/configs/watchdog.appsettings.yml appsettings.yml
 
