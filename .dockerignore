@@ -1,0 +1,12 @@
+# c# project .gitignore
+
+.git
+.github
+**/bin
+**/obj
+.vs
+.idea
+*.user
+*.suo
+TestResults
+*.nupkg
