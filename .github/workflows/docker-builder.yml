@@ -1,0 +1,75 @@
+# Github Actions: ss14.watchdog builder
+name: ss14.watchdog docker builder
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+concurrency: production
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  parse_phase:
+    runs-on: ubuntu-latest
+    name: Get build tag for further artifact pushing
+    env:
+      JOB_REF: ${{ github.ref }}
+    outputs:
+      BUILD_TAG: ${{ steps.tag-selector.outputs.BUILD_TAG }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          ref: ${{ github.ref }}
+      - id: tag-selector
+        run: echo "BUILD_TAG=${GITHUB_REF#refs/*/}" >> "$GITHUB_OUTPUT"
+      - run: |
+          cat <<-EOF
+            Github Actions outputs debug:
+            BUILD_TAG: ${{ steps.tag-selector.outputs.BUILD_TAG }}
+          EOF
+
+  docker_build_by_depot_phase:
+    runs-on: ubuntu-latest
+    name: depot : puild-push to ghcr
+    needs: [ parse_phase ]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          ref: ${{ github.ref }}
+      - uses: depot/setup-action@v1
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # https://github.community/t/additional-function-s-lowercase-uppercase/140632
+      - name: lowercase repository name
+        run: |
+          echo "GH_LWREPONAME=${GITHUB_REPOSITORY,,}" >>${GITHUB_ENV}
+      - uses: depot/build-push-action@v1
+        with:
+          push: true
+          project: ${{ secrets.DEPOT_PROJECT }}
+          tags: ghcr.io/${{ env.GH_LWREPONAME }}:${{ needs.parse_phase.outputs.BUILD_TAG }}
+          platforms: linux/amd64
+          context: .
+          build-args: |
+            APP_MAIN_VERSION=${{ needs.parse_phase.outputs.BUILD_TAG }}
+            APP_MAIN_BUILDTIME=${{ needs.parse_phase.outputs.BUILD_TIME }}
+      - name: Telegram notify
+        run: |
+          cat <<- EOF | /usr/bin/curl -s -XPOST "https://api.telegram.org/${{ secrets.TGRM_BOT_SECRET }}/sendMessage" \
+            -d chat_id="${{ secrets.TGRM_CHAT_ID }}" -d text="$(cat /dev/stdin)" &>/dev/null
+          SS220-SS14.Watchdog Builder (Github Actions)
+
+          Build ${{ github.run_number }} of job ${{ github.workflow }} has been completed.
+          Builded commit: ${{ github.sha }}
+          EOF
+
