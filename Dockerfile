@@ -5,7 +5,7 @@ ARG DOTNET_VERSION=10.0
 ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-noble
 ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-noble-chiseled-composite
 ARG BUSYBOX_IMAGE=busybox:1.37.0-uclibc
-ARG APP_UID=nobody
+ARG APP_UID=1000
 
 ### busybox for sh access
 FROM ${BUSYBOX_IMAGE} AS busybox
@@ -20,7 +20,7 @@ LABEL maintainer="mindhunter86 <mindhunter86@vkom.cc>"
 WORKDIR /usr/sources/ss14.watchdog
 
 # hadolint/hadolint - DL4006
-# SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 COPY SS14.Watchdog/SS14.Watchdog.csproj SS14.Watchdog/
 RUN dotnet restore -r linux-x64 SS14.Watchdog/SS14.Watchdog.csproj
@@ -41,6 +41,9 @@ RUN dotnet publish SS14.Watchdog/SS14.Watchdog.csproj \
 FROM ${RUNTIME_IMAGE} as application
 LABEL maintainer="mindhunter86 <mindhunter86@vkom.cc>"
 WORKDIR /data/ss14/watchdog
+
+# hadolint/hadolint - DL4006
+SHELL ["/bin/sh", "-eo", "pipefail", "-c"]
 
 # common production-ready env
 ENV TZ=Etc/UTC \
@@ -71,7 +74,7 @@ COPY --from=build /usr/share/zoneinfo/Etc/UTC /etc/localtime
 COPY --from=build /usr/sources/ss14.watchdog/dist/ ./
 
 RUN busybox rm -vf appsettings.yml \
-  && busybox mkdir -m0500 -p /data/ss14/configs \
+  && busybox mkdir -p /data/ss14/configs \
   && busybox ln -s /data/ss14/instances instances \
   && busybox ln -s /data/ss14/configs/watchdog.appsettings.yml appsettings.yml
 
