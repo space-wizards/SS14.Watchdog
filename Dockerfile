@@ -5,7 +5,6 @@ ARG DOTNET_VERSION=10.0
 ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-noble
 ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-noble-chiseled-composite
 ARG BUSYBOX_IMAGE=busybox:1.37.0-uclibc
-ARG APP_UID=1000
 
 ### busybox for sh access
 FROM ${BUSYBOX_IMAGE} AS busybox
@@ -17,6 +16,8 @@ RUN mkdir -p /bb/bin \
 ### NET10 building
 FROM ${SDK_IMAGE} as build
 LABEL maintainer="mindhunter86 <mindhunter86@vkom.cc>"
+
+USER 0:0
 WORKDIR /usr/sources/ss14.watchdog
 
 # hadolint/hadolint - DL4006
@@ -40,6 +41,8 @@ RUN dotnet publish SS14.Watchdog/SS14.Watchdog.csproj \
 ### NET10 distroless : github.com/dotnet/dotnet-docker
 FROM ${RUNTIME_IMAGE} as application
 LABEL maintainer="mindhunter86 <mindhunter86@vkom.cc>"
+
+USER 0:0
 WORKDIR /data/ss14/watchdog
 
 # hadolint/hadolint - DL4006
@@ -60,6 +63,8 @@ ENV DOTNET_CLI_HOME="/tmp" \
   DOTNET_TC_QuickJitForLoops="1" \
   DOTNET_ReadyToRun="0" \
   ROBUST_NUMERICS_AVX="true" \
+  DOTNET_GCHeapCount="8" \
+  DOTNET_gcConcurrent="1" \
   DOTNET_PROCESSOR_COUNT="16"
 
 # sh is a requirement for custom sh scripts like CPU pinning utilities
@@ -71,9 +76,10 @@ COPY --from=busybox /bb/bin/ /bin/
 COPY --from=build /usr/share/zoneinfo/Etc/UTC /etc/localtime
 
 # application builded data copy
-COPY --from=build /usr/sources/ss14.watchdog/dist/ ./
+COPY --from=build --chown=0:0 /usr/sources/ss14.watchdog/dist/ ./
 
 RUN busybox rm -vf appsettings.yml \
+  && busybox chmod o+w /data/ss14/watchdog \
   && busybox ln -s /data/ss14/instances instances \
   && busybox ln -s /data/ss14/configs/watchdog.appsettings.yml appsettings.yml
 
