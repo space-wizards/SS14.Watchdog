@@ -3,7 +3,7 @@
 
 ARG DOTNET_VERSION=10.0
 ARG SDK_IMAGE=mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-noble
-ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-noble-chiseled-composite
+ARG RUNTIME_IMAGE=mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-noble-chiseled-composite-extra
 ARG BUSYBOX_IMAGE=busybox:1.37.0-uclibc
 
 ### busybox for sh access
@@ -15,7 +15,8 @@ RUN mkdir -p /bb/bin \
   && ln -s /bin/busybox /bb/bin/taskset \
   && ln -s /bin/busybox /bb/bin/chrt \
   && ln -s /bin/busybox /bb/bin/awk \
-  && ln -s /bin/busybox /bb/bin/tr
+  && ln -s /bin/busybox /bb/bin/tr \
+  && ln -s /bin/busybox /bb/bin/sleep
 
 ### NET10 building
 FROM ${SDK_IMAGE} as build
@@ -39,8 +40,7 @@ RUN dotnet publish SS14.Watchdog/SS14.Watchdog.csproj \
   /p:SelfContained=false \
   /p:UseAppHost=false \
   /p:DebugType=None \
-  /p:DebugSymbols=false \
-  /p:InvariantGlobalization=true
+  /p:DebugSymbols=false
 
 ### NET10 distroless : github.com/dotnet/dotnet-docker
 FROM ${RUNTIME_IMAGE} as application
@@ -56,7 +56,6 @@ SHELL ["/bin/sh", "-eo", "pipefail", "-c"]
 ENV TZ=Etc/UTC \
   DOTNET_ENVIRONMENT=Production \
   ASPNETCORE_ENVIRONMENT=Production \
-  DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
   DOTNET_EnableDiagnostics=0 \
   PATH="/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
