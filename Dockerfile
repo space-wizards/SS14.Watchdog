@@ -42,7 +42,7 @@ RUN dotnet publish SS14.Watchdog/SS14.Watchdog.csproj \
 FROM ${RUNTIME_IMAGE} as application
 LABEL maintainer="mindhunter86 <mindhunter86@vkom.cc>"
 
-USER 0:0
+USER 0:${APP_UID}
 WORKDIR /data/ss14/watchdog
 
 # hadolint/hadolint - DL4006
@@ -76,7 +76,7 @@ COPY --from=busybox /bb/bin/ /bin/
 COPY --from=build /usr/share/zoneinfo/Etc/UTC /etc/localtime
 
 # application builded data copy
-COPY --from=build --chown=0:0 /usr/sources/ss14.watchdog/dist/ ./
+COPY --from=build --chown=0:${APP_UID} /usr/sources/ss14.watchdog/dist/ ./
 
 RUN busybox rm -vf appsettings.yml \
   && busybox chmod o+w /data/ss14/watchdog \
