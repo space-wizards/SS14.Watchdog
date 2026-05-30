@@ -11,7 +11,11 @@ FROM ${BUSYBOX_IMAGE} AS busybox
 LABEL maintainer="mindhunter86 <mindhunter86@vkom.cc>"
 RUN mkdir -p /bb/bin \
   && cp /bin/busybox /bb/bin/busybox \
-  && ln -s /bin/busybox /bb/bin/sh
+  && ln -s /bin/busybox /bb/bin/sh \
+  && ln -s /bin/busybox /bb/bin/taskset \
+  && ln -s /bin/busybox /bb/bin/chrt \
+  && ln -s /bin/busybox /bb/bin/awk \
+  && ln -s /bin/busybox /bb/bin/tr
 
 ### NET10 building
 FROM ${SDK_IMAGE} as build
