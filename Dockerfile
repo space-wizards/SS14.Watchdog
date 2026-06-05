@@ -25,133 +25,91 @@ RUN mkdir -p /bb/bin \
   && ln -s /bin/busybox /bb/bin/grep
 
 ### FFMPEG BUILD
-# FROM ${FFMPEG_IMAGE} AS ffmpeg
-# USER 0:0
-
-# ENV DEBIAN_FRONTEND=noninteractive
-
-# RUN apt-get update && \
-#     apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
-#     rm -rf /var/lib/apt/lists/*
-
-# # Собираем только runtime closure для ffmpeg/ffprobe.
-# RUN mkdir -p /ffmpeg-root/usr/local/bin /ffmpeg-root/usr/local/lib/ffmpeg && \
-#     cp -L /usr/bin/ffmpeg /ffmpeg-root/usr/local/bin/ffmpeg && \
-#     cp -L /usr/bin/ffprobe /ffmpeg-root/usr/local/bin/ffprobe && \
-#     for bin in /usr/bin/ffmpeg /usr/bin/ffprobe; do \
-#       ldd "$bin" \
-#         | awk '/=> \// { print $3 } /^\// { print $1 }' \
-#         | sort -u; \
-#     done \
-#       | while read -r lib; do \
-#           cp -L "$lib" /ffmpeg-root/usr/local/lib/ffmpeg/; \
-#         done
-
-# # Диагностика: эта библиотека у тебя сейчас отсутствует в final image.
-# RUN find /ffmpeg-root -name 'libavdevice.so*' -o -name 'libavcodec.so*' -o -name 'libavformat.so*'
-# # Проверка внутри stage.
-# RUN LD_LIBRARY_PATH=/ffmpeg-root/usr/local/lib/ffmpeg \
-#     /ffmpeg-root/usr/local/bin/ffmpeg -hide_banner -version
-
-
-
-
-
-
 FROM ${FFMPEG_BUILD_IMAGE} AS ffmpeg
-USER 0:0
-
-ENV DEBIAN_FRONTEND=noninteractive
+LABEL maintainer="mindhunter86 <mindhunter86@vkom.cc>"
 
 ARG FFMPEG_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
-      ca-certificates \
-      curl \
-      xz-utils \
-      build-essential \
-      pkg-config \
-      nasm \
-      pax-utils \
-      libvorbis-dev \
-    && rm -rf /var/lib/apt/lists/*
+USER 0:0
+WORKDIR /usr/src
 
-WORKDIR /build
+# hadolint/hadolint - DL4006
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-RUN curl -fsSLO "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" && \
-    tar -xf "ffmpeg-${FFMPEG_VERSION}.tar.xz"
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        wget \
+        xz-utils \
+        build-essential \
+        pkg-config \
+        nasm \
+        pax-utils \
+        libvorbis-dev \
+    && rm -rf /var/lib/apt/lists/* \
+    && wget -qO- "https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz" | tar JxvC .
 
-WORKDIR /build/ffmpeg-${FFMPEG_VERSION}
-
-RUN test -f libavfilter/af_acrusher.c && echo "acrusher source exists" || echo "acrusher source missing"
-RUN grep -R "acrusher" -n libavfilter | head -50 || true
-
+WORKDIR /usr/src/ffmpeg-${FFMPEG_VERSION}
 RUN ./configure \
-      --prefix=/opt/ffmpeg \
-      --disable-everything \
-      --disable-autodetect \
-      --disable-doc \
-      --disable-debug \
-      --disable-ffplay \
-      --disable-ffprobe \
-      --enable-ffmpeg \
-      --disable-avdevice \
-      --disable-swscale \
-      --enable-avcodec \
-      --enable-avformat \
-      --enable-avfilter \
-      --enable-swresample \
-      --enable-protocol=unix \
-      --enable-muxer=ogg \
-      --enable-demuxer=ogg \
-      --enable-parser=vorbis \
-      --enable-parser=opus \
-      --enable-parser=flac \
-      --enable-decoder=vorbis \
-      --enable-decoder=opus \
-      --enable-decoder=flac \
-      --enable-libvorbis \
-      --enable-encoder=libvorbis \
-      --enable-filter=highpass \
-      --enable-filter=lowpass \
-      --enable-filter=acrusher \
-      --enable-filter=aresample \
-      --enable-filter=aformat \
-      --enable-filter=anull \
-      --enable-small \
-      --enable-static \
-      --disable-shared && \
-    grep -C 8 -E 'acrusher_filter|ACRUSHER' ffbuild/config.log ffbuild/config.mak || true \
-    make -j"$(nproc)" && \
-    make install && \
-    strip /opt/ffmpeg/bin/ffmpeg
+    --prefix=/usr/src/ffmpeg \
+    --disable-everything \
+    --disable-autodetect \
+    --disable-doc \
+    --disable-debug \
+    --disable-ffplay \
+    --disable-ffprobe \
+    --enable-ffmpeg \
+    --disable-avdevice \
+    --disable-swscale \
+    --enable-avcodec \
+    --enable-avformat \
+    --enable-avfilter \
+    --enable-swresample \
+    --enable-protocol=unix \
+    --enable-muxer=ogg \
+    --enable-demuxer=ogg \
+    --enable-parser=vorbis \
+    --enable-parser=opus \
+    --enable-parser=flac \
+    --enable-decoder=vorbis \
+    --enable-decoder=opus \
+    --enable-decoder=flac \
+    --enable-libvorbis \
+    --enable-encoder=libvorbis \
+    --enable-filter=highpass \
+    --enable-filter=lowpass \
+    --enable-filter=acrusher \
+    --enable-filter=aresample \
+    --enable-filter=aformat \
+    --enable-filter=anull \
+    --enable-small \
+    --enable-static \
+    --disable-shared \
+  && make -j"$(nproc)" \
+  && make install \
+  && strip /usr/src/ffmpeg/bin/ffmpeg \
+  && ( /usr/src/ffmpeg/bin/ffmpeg -hide_banner -filters | grep -E 'acrusher|highpass|lowpass' ||: )
 
-RUN grep -E 'ACRUSHER|acrusher' ffbuild/config.mak ffbuild/config.log || true
-RUN grep -E '^CONFIG_(ACRUSHER|HIGHPASS|LOWPASS)_FILTER=yes' ffbuild/config.mak
-RUN grep -C 8 -E 'acrusher_filter|ACRUSHER' ffbuild/config.log ffbuild/config.mak || true
-RUN /opt/ffmpeg/bin/ffmpeg -hide_banner -filters | grep -E 'acrusher|highpass|lowpass' || true
+WORKDIR /usr/src/ffmpeg
+RUN mkdir -p /usr/local/ffmpeg/bin /usr/local/ffmpeg/lib \
+  && cp -vL ./bin/ffmpeg /usr/local/ffmpeg/bin \
+  && lddtree -l bin/ffmpeg \
+    | sort -u \
+    | grep '^/' \
+    | while read -r path; do \
+        if [ -f "$path" ]; then \
+          base="$(basename "$path")"; \
+          case "$base" in \
+            ffmpeg|ld-linux*) ;; \
+            *) cp -vL "$path" "/usr/local/ffmpeg/lib/$base" ;; \
+          esac; \
+        fi; \
+      done
 
-RUN mkdir -p /ffmpeg-root/usr/local/bin /ffmpeg-root/usr/local/lib/ffmpeg && \
-    cp -L /opt/ffmpeg/bin/ffmpeg /ffmpeg-root/usr/local/bin/ffmpeg
-
-RUN lddtree -l /opt/ffmpeg/bin/ffmpeg \
-      | sort -u \
-      | grep '^/' \
-      | while read -r path; do \
-          if [ -f "$path" ]; then \
-            base="$(basename "$path")"; \
-            case "$base" in \
-              ffmpeg|ld-linux*) ;; \
-              *) cp -L "$path" "/ffmpeg-root/usr/local/lib/ffmpeg/$base" ;; \
-            esac; \
-          fi; \
-        done
-
-RUN LD_LIBRARY_PATH=/ffmpeg-root/usr/local/lib/ffmpeg \
-    /ffmpeg-root/usr/local/bin/ffmpeg -hide_banner -version
-
-
+ENV LD_LIBRARY_PATH=/usr/local/ffmpeg/lib
+RUN /usr/local/ffmpeg/bin/ffmpeg -hide_banner -version
 
 ### NET10 building
 FROM ${SDK_IMAGE} as build
@@ -177,7 +135,7 @@ RUN dotnet publish SS14.Watchdog/SS14.Watchdog.csproj \
   /p:DebugType=None \
   /p:DebugSymbols=false
 
-# libz нужен MonoPosixHelper.
+# libz for MonoPosixHelper.
 RUN mkdir -p /native-libs && \
     zlib="$(find /lib /usr/lib -name libz.so.1 -print -quit)" && \
     test -n "$zlib" && \
@@ -220,31 +178,29 @@ COPY --from=busybox /bb/bin/ /bin/
 # copy TZdata
 COPY --from=build /usr/share/zoneinfo/Etc/UTC /etc/localtime
 
+# RT MonoPosixHelper requisites
 COPY --chown=0:0 --from=build /native-libs/libz.so.1 /usr/lib/libz.so.1
 
-# COPY --chown=0:0 --from=ffmpeg /ffmpeg-root/usr/local/bin/ /usr/bin/
-# COPY --chown=0:0 --from=ffmpeg /ffmpeg-root/usr/local/lib/ffmpeg/ /usr/lib/ffmpeg/
+# custom ffmpeg for TTS
+COPY --chown=0:0 --from=ffmpeg /usr/local/ffmpeg/bin/ /usr/bin/
+COPY --chown=0:0 --from=ffmpeg /usr/local/ffmpeg/lib/ /usr/lib/ffmpeg/
 
-COPY --chown=0:0 --from=ffmpeg /ffmpeg-root/usr/local/bin/ffmpeg /usr/bin/ffmpeg
-COPY --chown=0:0 --from=ffmpeg /ffmpeg-root/usr/local/lib/ffmpeg/ /usr/lib/ffmpeg/
+# application builded data copy
+COPY --from=build --chown=0:${APP_UID} /usr/sources/ss14.watchdog/dist/ ./
 
+# post-copy image cleanup
+RUN busybox rm -vf appsettings.yml \
+  && busybox chmod o+w /data/ss14/watchdog \
+  && busybox ln -s /data/ss14/instances instances \
+  && busybox ln -s /data/ss14/configs/watchdog.appsettings.yml appsettings.yml
+
+# last checks for ffmpeg and it's libs
 RUN ffmpeg -hide_banner -version && \
     ffmpeg -hide_banner -protocols | grep -E '^[[:space:]]*unix$' && \
     ffmpeg -hide_banner -muxers | grep -E '[[:space:]]E[[:space:]]+ogg' && \
     ffmpeg -hide_banner -filters | grep highpass && \
     ffmpeg -hide_banner -filters | grep lowpass && \
     ffmpeg -hide_banner -filters | grep acrusher
-
-# Проверяем, что ffmpeg стартует уже в final image.
-# RUN ffmpeg -hide_banner -version && ffprobe -hide_banner -version
-
-# application builded data copy
-COPY --from=build --chown=0:${APP_UID} /usr/sources/ss14.watchdog/dist/ ./
-
-RUN busybox rm -vf appsettings.yml \
-  && busybox chmod o+w /data/ss14/watchdog \
-  && busybox ln -s /data/ss14/instances instances \
-  && busybox ln -s /data/ss14/configs/watchdog.appsettings.yml appsettings.yml
 
 USER ${APP_UID}
 ENTRYPOINT ["dotnet", "SS14.Watchdog.dll"]
