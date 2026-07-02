@@ -22,7 +22,7 @@ Then start Watchdog with one of the starter scripts:
 The starter config uses the `Git` update provider. The starter script will clone the target repository into SS14.Watchdog/instances/\<instance_name>
 
 After it has run once you will see a config.toml that you can adjust to set the CVars to your liking.
-For the full list of available CVars you will need to browse the development repository of your target server.
+For the full list of available CVars you will need to browse the development repository of your target server. Look for CCVars and CVars with Server flags.
 
 Per-instance watchdog logs are written to `logs/<instance>/watchdog-*.log`.
 
