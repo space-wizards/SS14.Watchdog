@@ -132,6 +132,6 @@ Use `Dummy` only for tests or manual experiments. It always reports an update an
 
 ## Long-term hosting
 
-For long-term public hosting, prefer a release pipeline that publishes builds and use `Manifest` updates instead of building from `Git` on the host.
+For long-term public hosting, prefer a release pipeline that publishes builds and use `Manifest` updates instead of building from `Git` on the host. See https://github.com/space-wizards/Robust.Cdn for manifest hosting.
 
 Use a real database for production game server data. The generated starter `config.toml` defaults are suitable for getting a server running, but public or persistent servers should configure PostgreSQL in `config.toml` instead of relying on local SQLite files.
