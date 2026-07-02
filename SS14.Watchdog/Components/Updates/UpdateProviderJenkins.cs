@@ -91,7 +91,8 @@ namespace SS14.Watchdog.Components.Updates
                     tempFile.Name);
 
                 // Download to file...
-                var resp = await _httpClient.GetAsync(serverDownload, cancel);
+                using var resp = await _httpClient.GetAsync(serverDownload, cancel);
+                resp.EnsureSuccessStatusCode();
                 await resp.Content.CopyToAsync(tempFile, cancel);
 
                 _logger.LogTrace("Deleting old bin directory ({binPath})", binPath);
