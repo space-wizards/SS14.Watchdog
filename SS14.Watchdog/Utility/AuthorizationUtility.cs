@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Mvc;
 
@@ -5,7 +6,7 @@ namespace SS14.Watchdog.Utility
 {
     public static class AuthorizationUtility
     {
-        public static bool TryParseBasicAuthentication(string authorization,
+        public static bool TryParseBasicAuthentication(string? authorization,
             [NotNullWhen(false)] out IActionResult? failure,
             [NotNullWhen(true)] out string? username,
             [NotNullWhen(true)] out string? password)
@@ -13,13 +14,24 @@ namespace SS14.Watchdog.Utility
             username = null;
             password = null;
 
-            if (!authorization.StartsWith("Basic "))
+            if (authorization == null || !authorization.StartsWith("Basic "))
             {
                 failure = new UnauthorizedResult();
                 return false;
             }
 
-            var split = Base64Util.Utf8Base64ToString(authorization[6..]).Split(':');
+            string decoded;
+            try
+            {
+                decoded = Base64Util.Utf8Base64ToString(authorization[6..]);
+            }
+            catch (FormatException)
+            {
+                failure = new BadRequestResult();
+                return false;
+            }
+
+            var split = decoded.Split(':');
 
             if (split.Length != 2)
             {
