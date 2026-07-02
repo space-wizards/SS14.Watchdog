@@ -11,8 +11,6 @@ The local config uses `bin/instances` and the `Local` update provider.
 
 ## Starter server
 
-The starter config uses the `Git` update provider; replace the API token, server name, branch, and set advertise=true as needed before hosting publicly.
-
 Before running a starter server for the first time, open `SS14.Watchdog/appsettings.Starter.yml`, read the comments, and update the placeholder values.
 
 Then start Watchdog with one of the starter scripts:
@@ -21,14 +19,14 @@ Then start Watchdog with one of the starter scripts:
 - PowerShell: `./run-starter.ps1`
 - Bash: `./run-starter.sh`
 
-The starter script will clone the target repository into SS14.Watchdog/instances/\<instance_name>
-
-Note that the instance_name is not the server name, it is just your name to refer to it. To update the server name set hostname in config.toml
+The starter config uses the `Git` update provider. The starter script will clone the target repository into SS14.Watchdog/instances/\<instance_name>
 
 After it has run once you will see a config.toml that you can adjust to set the CVars to your liking.
 For the full list of available CVars you will need to browse the development repository of your target server.
 
 Per-instance watchdog logs are written to `logs/<instance>/watchdog-*.log`.
+
+Note that the instance_name is not the server name, it is just your name to refer to it. To update the server name set hostname in config.toml
 
 ## Update checks
 
