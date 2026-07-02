@@ -99,6 +99,8 @@ namespace SS14.Watchdog.Components.ServerManagement
             _serverCfg.OnChange(CfgChanged);
 
             var options = _serverCfg.CurrentValue;
+            ValidateConfiguration(options);
+
             var instanceRoot = Path.Combine(Environment.CurrentDirectory, options.InstanceRoot);
 
             if (!Directory.Exists(instanceRoot))
@@ -143,6 +145,105 @@ namespace SS14.Watchdog.Components.ServerManagement
 
             // This calls ExecuteAsync
             await base.StartAsync(cancellationToken);
+        }
+
+        private void ValidateConfiguration(ServersConfiguration options)
+        {
+            _logger.LogInformation(
+                "Validating watchdog server configuration for {InstanceCount} instance(s)",
+                options.Instances.Count);
+
+            var errors = new List<string>();
+            var ports = new Dictionary<ushort, string>();
+
+            if (options.Instances.Count == 0)
+            {
+                _logger.LogWarning("No server instances are configured.");
+            }
+
+            foreach (var (key, instance) in options.Instances)
+            {
+                LogInstanceConfiguration(key, instance);
+                ValidateApiPort(key, instance, ports, errors);
+                WarnIfApiTokenMissing(key, instance);
+                ValidateBaseUrl(key, instance, errors);
+            }
+
+            if (errors.Count == 0)
+            {
+                _logger.LogInformation("Watchdog server configuration validation passed.");
+                return;
+            }
+
+            foreach (var error in errors)
+            {
+                _logger.LogError("Configuration error: {Error}", error);
+            }
+
+            throw new InvalidOperationException("Invalid watchdog server configuration: " + string.Join(" ", errors));
+        }
+
+        private void LogInstanceConfiguration(string key, InstanceConfiguration instance)
+        {
+            _logger.LogInformation(
+                "Configured instance {Key}: name={Name}, apiPort={ApiPort}, updateType={UpdateType}",
+                key,
+                instance.Name ?? "<unnamed>",
+                instance.ApiPort,
+                instance.UpdateType ?? "<none>");
+        }
+
+        private static void ValidateApiPort(
+            string key,
+            InstanceConfiguration instance,
+            Dictionary<ushort, string> ports,
+            List<string> errors)
+        {
+            if (instance.ApiPort == 0)
+            {
+                errors.Add($"Instance '{key}' must set Servers:Instances:{key}:ApiPort.");
+                return;
+            }
+
+            if (!ports.TryAdd(instance.ApiPort, key))
+            {
+                errors.Add(
+                    $"Instances '{ports[instance.ApiPort]}' and '{key}' both use ApiPort {instance.ApiPort}.");
+            }
+        }
+
+        private void WarnIfApiTokenMissing(string key, InstanceConfiguration instance)
+        {
+            if (!string.IsNullOrWhiteSpace(instance.ApiToken) ||
+                !string.IsNullOrWhiteSpace(instance.ApiTokenFile))
+            {
+                return;
+            }
+
+            _logger.LogWarning(
+                "Instance {Key} has no ApiToken or ApiTokenFile configured; watchdog admin API calls for this instance will not be usable.",
+                key);
+        }
+
+        private void ValidateBaseUrl(string key, InstanceConfiguration instance, List<string> errors)
+        {
+            if (!UpdateProviderNeedsBaseUrl(key, instance))
+                return;
+
+            if (string.IsNullOrWhiteSpace(_configuration["BaseUrl"]))
+            {
+                errors.Add(
+                    $"Instance '{key}' uses {instance.UpdateType} updates and requires a root BaseUrl in configuration.");
+            }
+        }
+
+        private bool UpdateProviderNeedsBaseUrl(string key, InstanceConfiguration instance)
+        {
+            if (instance.UpdateType == "Local")
+                return true;
+
+            var hybridAcz = _configuration.GetValue<bool?>($"Servers:Instances:{key}:Updates:HybridACZ") ?? true;
+            return instance.UpdateType == "Git" && !hybridAcz;
         }
 
         private void CfgChanged(ServersConfiguration obj)

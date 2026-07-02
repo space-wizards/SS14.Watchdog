@@ -16,6 +16,12 @@ public class ProcessOptions
     public bool PersistServers { get; set; } = false;
 
     /// <summary>
+    /// Whether to launch game server processes in their own visible shell window.
+    /// This is intended for local development and starter hosting, not unattended deployments.
+    /// </summary>
+    public bool LaunchInNewWindow { get; set; } = false;
+
+    /// <summary>
     /// Controls how the watchdog manages game server processes.
     /// </summary>
     public ProcessMode Mode { get; set; } = ProcessMode.Basic;

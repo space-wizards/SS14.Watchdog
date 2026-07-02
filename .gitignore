@@ -1,6 +1,9 @@
 appsettings.Secret.yml
 SS14.Watchdog/data.db
 SS14.Watchdog/data.db-journal
+instances/
+SS14.Watchdog/instances/
+SS14.Watchdog/bin/instances/
 
 
 # Created by https://www.gitignore.io/api/csharp

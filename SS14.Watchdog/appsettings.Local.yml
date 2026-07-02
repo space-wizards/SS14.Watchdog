@@ -1,0 +1,53 @@
+Serilog:
+  Using: [ "Serilog.Sinks.Console", "Serilog.Sinks.File", "Serilog.Sinks.Map" ]
+  MinimumLevel:
+    Default: Information
+    Override:
+      SS14: Debug
+      Microsoft: Warning
+      Microsoft.Hosting.Lifetime: Information
+
+  WriteTo:
+    - Name: Console
+      Args:
+        Theme: "Serilog.Sinks.SystemConsole.Themes.AnsiConsoleTheme::Code, Serilog.Sinks.Console"
+        OutputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}"
+    - Name: File
+      Args:
+        Path: "logs/watchdog-.log"
+        RollingInterval: Day
+        RetainedFileCountLimit: 14
+        OutputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}"
+
+BaseUrl: "http://localhost:5000/"
+
+Data:
+  File: "bin/local-data.db"
+
+Process:
+  Mode: Basic
+  PersistServers: false
+  LaunchInNewWindow: true
+
+Servers:
+  InstanceRoot: "bin/instances"
+  Instances:
+    local_one:
+      Name: "Local One"
+      ApiToken: "local-dev-token-one"
+      ApiPort: 1212
+      RunCommand: "../space-station-14/bin/Content.Server/Content.Server"
+      UpdateType: Local
+      Updates:
+        CurrentVersion: "local-dev"
+      TimeoutSeconds: 90
+
+    # local_two:
+    #   Name: "Local Two"
+    #   ApiToken: "local-dev-token-two"
+    #   ApiPort: 1213
+    #   RunCommand: "../space-station-14/bin/Content.Server/Content.Server"
+    #   UpdateType: Local
+    #   Updates:
+    #     CurrentVersion: "local-dev"
+    #   TimeoutSeconds: 90

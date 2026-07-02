@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Serilog;
+using Serilog.Events;
 using Serilog.Sinks.Loki;
 using Serilog.Sinks.Loki.Labels;
 
@@ -28,10 +30,32 @@ namespace SS14.Watchdog
                 .UseSerilog((ctx, cfg) =>
                 {
                     cfg.ReadFrom.Configuration(ctx.Configuration);
+                    cfg.Enrich.FromLogContext();
 
                     SetupLoki(cfg, ctx.Configuration);
+                    SetupInstanceFileLogging(cfg);
                 })
                 .ConfigureWebHostDefaults(webBuilder => webBuilder.UseStartup<Startup>());
+
+        private static void SetupInstanceFileLogging(LoggerConfiguration log)
+        {
+            log.WriteTo.Map(
+                "Instance",
+                "(watchdog)",
+                (instance, writeTo) => writeTo.File(
+                    Path.Combine("logs", SanitizePathSegment(instance), "watchdog-.log"),
+                    rollingInterval: RollingInterval.Day,
+                    retainedFileCountLimit: 14,
+                    restrictedToMinimumLevel: LogEventLevel.Debug,
+                    outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}"),
+                sinkMapCountLimit: 64);
+        }
+
+        private static string SanitizePathSegment(string value)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            return string.Concat(value.Select(c => invalid.Contains(c) ? '_' : c)).Trim();
+        }
 
         private static void SetupLoki(LoggerConfiguration log, IConfiguration cfg)
         {
