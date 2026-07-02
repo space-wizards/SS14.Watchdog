@@ -15,7 +15,7 @@ namespace SS14.Watchdog.Tests.Controllers
         public void TestAuthorizationSuccess()
         {
             // Arrange
-            const string secret = "secure that disk";
+            const string secret = "Secure that disk!";
             const string key = "foo";
 
             var instanceMock = new Mock<IServerInstance>();
@@ -93,7 +93,7 @@ namespace SS14.Watchdog.Tests.Controllers
         public async Task TestPing()
         {
             // Arrange
-            const string secret = "secure that disk";
+            const string secret = "Secure that disk!";
             const string key = "foo";
 
             var instanceMock = new Mock<IServerInstance>();
