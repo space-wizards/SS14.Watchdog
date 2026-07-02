@@ -20,6 +20,8 @@ namespace SS14.Watchdog.Components.ProcessManagement;
 /// </remarks>
 public sealed class ProcessManagerBasic : IProcessManager
 {
+    private static readonly object EnvironmentLock = new();
+
     private readonly IOptions<ProcessOptions> _options;
     private readonly ILogger<ProcessManagerBasic> _logger;
     private readonly DataManager _dataManager;
@@ -44,10 +46,33 @@ public sealed class ProcessManagerBasic : IProcessManager
         _logger.LogDebug("Starting game server process for instance {Key}: {Program}", instance.Key, data.Program);
         _logger.LogTrace("Working directory: {WorkingDir}", data.WorkingDirectory);
 
+        var logDirectory = EnsureLogDirectory(instance);
+        var robustLogFile = Path.Combine(logDirectory, "server.log");
+
+        if (_options.Value.LaunchInNewWindow)
+        {
+            _logger.LogInformation(
+                "Server {Key} will launch in a visible window. Server log file: {ServerLog}",
+                instance.Key,
+                robustLogFile);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "Server {Key} process logs: stdout={StdoutLog}, stderr={StderrLog}, serverLog={ServerLog}",
+                instance.Key,
+                Path.Combine(logDirectory, "server.out.log"),
+                Path.Combine(logDirectory, "server.err.log"),
+                robustLogFile);
+        }
+
         var startInfo = new ProcessStartInfo();
         startInfo.FileName = data.Program;
         startInfo.WorkingDirectory = data.WorkingDirectory;
-        startInfo.UseShellExecute = false;
+        startInfo.UseShellExecute = _options.Value.LaunchInNewWindow;
+        startInfo.CreateNoWindow = false;
+        startInfo.RedirectStandardOutput = !_options.Value.LaunchInNewWindow;
+        startInfo.RedirectStandardError = !_options.Value.LaunchInNewWindow;
 
         foreach (var argument in data.Arguments)
         {
@@ -55,23 +80,54 @@ public sealed class ProcessManagerBasic : IProcessManager
             startInfo.ArgumentList.Add(argument);
         }
 
-        foreach (var (var, value) in data.EnvironmentVariables)
+        if (!startInfo.UseShellExecute)
         {
-            _logger.LogTrace("Env: {EnvVar} = {EnvValue}", var, value);
-            startInfo.EnvironmentVariables[var] = value;
+            foreach (var (var, value) in data.EnvironmentVariables)
+            {
+                _logger.LogTrace("Env: {EnvVar} = {EnvValue}", var, value);
+                startInfo.EnvironmentVariables[var] = value;
+            }
+
+            startInfo.EnvironmentVariables["ROBUST_LOG_FILE"] = robustLogFile;
         }
 
         _logger.LogDebug("Launching...");
+
+        StreamWriter? stdoutLog = null;
+        StreamWriter? stderrLog = null;
+
         Process? process;
         try
         {
-            process = Process.Start(startInfo);
+            if (_options.Value.LaunchInNewWindow)
+            {
+                process = StartServerInNewWindow(startInfo, data, robustLogFile);
+            }
+            else
+            {
+                stdoutLog = OpenProcessLog(logDirectory, "server.out.log");
+                stderrLog = OpenProcessLog(logDirectory, "server.err.log");
+                var stdoutWriter = stdoutLog;
+                var stderrWriter = stderrLog;
+
+                process = Process.Start(startInfo);
+
+                if (process == null)
+                    throw new Exception("No process was started??");
+
+                process.OutputDataReceived += (_, e) => WriteProcessOutput(stdoutWriter, e.Data);
+                process.ErrorDataReceived += (_, e) => WriteProcessOutput(stderrWriter, e.Data);
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+            }
 
             if (process == null)
                 throw new Exception("No process was started??");
         }
         catch (Exception e)
         {
+            stdoutLog?.Dispose();
+            stderrLog?.Dispose();
             _logger.LogError(e, "Process launch failed!");
             throw;
         }
@@ -84,7 +140,71 @@ public sealed class ProcessManagerBasic : IProcessManager
             PersistPid(instance, process);
         }
 
-        return Task.FromResult<IProcessHandle>(new Handle(process));
+        return Task.FromResult<IProcessHandle>(new Handle(process, stdoutLog, stderrLog));
+    }
+
+    private static Process? StartServerInNewWindow(
+        ProcessStartInfo startInfo,
+        ProcessStartData data,
+        string robustLogFile)
+    {
+        lock (EnvironmentLock)
+        {
+            var previousValues = new (string Name, string? Value)[data.EnvironmentVariables.Count + 1];
+            var i = 0;
+            try
+            {
+                foreach (var (name, value) in data.EnvironmentVariables)
+                {
+                    previousValues[i++] = (name, Environment.GetEnvironmentVariable(name));
+                    Environment.SetEnvironmentVariable(name, value);
+                }
+
+                previousValues[i++] = ("ROBUST_LOG_FILE", Environment.GetEnvironmentVariable("ROBUST_LOG_FILE"));
+                Environment.SetEnvironmentVariable("ROBUST_LOG_FILE", robustLogFile);
+
+                return Process.Start(startInfo);
+            }
+            finally
+            {
+                for (var j = 0; j < i; j++)
+                    Environment.SetEnvironmentVariable(previousValues[j].Name, previousValues[j].Value);
+            }
+        }
+    }
+
+    private static string EnsureLogDirectory(IServerInstance instance)
+    {
+        var logDirectory = Path.Combine(instance.InstanceDir, "logs");
+        Directory.CreateDirectory(logDirectory);
+        return logDirectory;
+    }
+
+    private static StreamWriter OpenProcessLog(string logDirectory, string fileName)
+    {
+        return new StreamWriter(
+            new FileStream(Path.Combine(logDirectory, fileName), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+        {
+            AutoFlush = true
+        };
+    }
+
+    private static void WriteProcessOutput(TextWriter writer, string? message)
+    {
+        if (message == null)
+            return;
+
+        lock (writer)
+        {
+            try
+            {
+                writer.WriteLine(message);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Process output events can arrive while the handle is being cleaned up.
+            }
+        }
     }
 
     private void PersistPid(IServerInstance instance, Process process)
@@ -167,11 +287,15 @@ public sealed class ProcessManagerBasic : IProcessManager
     private sealed class Handle : IProcessHandle
     {
         private readonly Process _process;
+        private readonly TextWriter? _stdoutLog;
+        private readonly TextWriter? _stderrLog;
         public bool IsRecovered;
 
-        public Handle(Process process)
+        public Handle(Process process, TextWriter? stdoutLog = null, TextWriter? stderrLog = null)
         {
             _process = process;
+            _stdoutLog = stdoutLog;
+            _stderrLog = stderrLog;
         }
 
         public void DumpProcess(string file, DumpType type)
@@ -183,6 +307,8 @@ public sealed class ProcessManagerBasic : IProcessManager
         public async Task WaitForExitAsync(CancellationToken cancel = default)
         {
             await _process.WaitForExitAsync(cancel);
+            _process.WaitForExit();
+            await DisposeLogsAsync();
         }
 
         public Task<ProcessExitStatus?> GetExitStatusAsync()
@@ -206,6 +332,19 @@ public sealed class ProcessManagerBasic : IProcessManager
             _process.Kill(entireProcessTree: true);
 
             return Task.CompletedTask;
+        }
+
+        private async Task DisposeLogsAsync()
+        {
+            if (_stdoutLog is IAsyncDisposable asyncStdout)
+                await asyncStdout.DisposeAsync();
+            else
+                _stdoutLog?.Dispose();
+
+            if (_stderrLog is IAsyncDisposable asyncStderr)
+                await asyncStderr.DisposeAsync();
+            else
+                _stderrLog?.Dispose();
         }
     }
 }

@@ -13,8 +13,11 @@ using SS14.Watchdog.Configuration.Updates;
 namespace SS14.Watchdog.Components.Updates
 {
     /// <summary>
-    ///     Update provider that allows doing manual updates on local files as updating method.
+    /// Treats files already placed in the instance directory as the deployed build and only updates the
+    /// recorded revision. This provider does not copy server files; external tooling or an operator is
+    /// responsible for putting server and optional client artifacts in the expected instance directories.
     /// </summary>
+    /// <seealso cref="UpdateProviderLocalConfiguration"/>
     public sealed class UpdateProviderLocal : UpdateProvider
     {
         private readonly IServerInstance _serverInstance;

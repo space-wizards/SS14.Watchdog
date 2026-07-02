@@ -16,6 +16,13 @@ using SS14.Watchdog.Configuration.Updates;
 
 namespace SS14.Watchdog.Components.Updates
 {
+    /// <summary>
+    /// Builds and packages the server from a Git repository on the watchdog host, then applies the produced
+    /// server zip as the instance's server binaries. Use this for local development or hosts that intentionally
+    /// build from source on the deployment machine. It requires Git, .NET, and optionally Python depending on
+    /// the repository packaging layout.
+    /// </summary>
+    /// <seealso cref="UpdateProviderGitConfiguration"/>
     public class UpdateProviderGit : UpdateProvider
     {
         private readonly ServerInstance _serverInstance;
@@ -38,12 +45,19 @@ namespace SS14.Watchdog.Components.Updates
             _configuration = config;
         }
 
-        private async Task<int> CommandHelper(string cd, string command, string[] args, CancellationToken cancel = default)
+        private async Task<CommandResult> CommandHelper(string cd, string command, string[] args, CancellationToken cancel = default)
         {
             var si = new ProcessStartInfo {
-                FileName = command, CreateNoWindow = true, UseShellExecute = true,
-                WorkingDirectory = cd
+                FileName = command,
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true
             };
+
+            if (!string.IsNullOrWhiteSpace(cd))
+                si.WorkingDirectory = cd;
+
             // MSDN lied to me! https://docs.microsoft.com/en-us/dotnet/api/system.diagnostics.processstartinfo.argumentlist?view=net-6.0
             foreach (var s in args)
                 si.ArgumentList.Add(s);
@@ -52,10 +66,31 @@ namespace SS14.Watchdog.Components.Updates
                 StartInfo = si
             };
             proc.Start();
-            await proc.WaitForExitAsync(cancel);
-            if (cancel.IsCancellationRequested)
-                return 127;
-            return proc.ExitCode;
+
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync(cancel);
+            var stderrTask = proc.StandardError.ReadToEndAsync(cancel);
+
+            try
+            {
+                await proc.WaitForExitAsync(cancel);
+                return new CommandResult(
+                    proc.ExitCode,
+                    await stdoutTask,
+                    await stderrTask);
+            }
+            catch (OperationCanceledException)
+            {
+                try
+                {
+                    proc.Kill(entireProcessTree: true);
+                }
+                catch (InvalidOperationException)
+                {
+                    // Process already exited.
+                }
+
+                throw;
+            }
         }
 
         private async Task CommandHelperChecked(string reason, string cd, string command, string[] args, CancellationToken cancel = default)
@@ -63,7 +98,18 @@ namespace SS14.Watchdog.Components.Updates
             int exitCode;
             try
             {
-                exitCode = await CommandHelper(cd, command, args, cancel);
+                var result = await CommandHelper(cd, command, args, cancel);
+                exitCode = result.ExitCode;
+                if (exitCode != 0)
+                {
+                    _logger.LogWarning(
+                        "Command failed while running {Command} {Arguments}. Exit code: {ExitCode}. Stdout: {Stdout}. Stderr: {Stderr}",
+                        command,
+                        string.Join(" ", args),
+                        result.ExitCode,
+                        result.Stdout,
+                        result.Stderr);
+                }
             }
             catch (Exception ex)
             {
@@ -80,7 +126,9 @@ namespace SS14.Watchdog.Components.Updates
             try
             {
                 var si = new ProcessStartInfo {
-                    FileName = command, CreateNoWindow = true,
+                    FileName = command,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
                     WorkingDirectory = cd,
                     RedirectStandardOutput = true
                 };
@@ -111,7 +159,7 @@ namespace SS14.Watchdog.Components.Updates
         {
             try
             {
-                return await CommandHelper(_repoPath, "git", new[] {"status"}) == 0;
+                return (await CommandHelper(_repoPath, "git", new[] {"status"})).ExitCode == 0;
             }
             catch (Exception)
             {
@@ -121,7 +169,12 @@ namespace SS14.Watchdog.Components.Updates
 
         private async Task<bool> GitFetchOrigin(CancellationToken cancel = default)
         {
-            return await CommandHelper(_repoPath, "git", new[] {"fetch", _baseUrl, _branch}, cancel) == 0;
+            _logger.LogInformation("Fetching git updates for {Key} from {Repository} branch {Branch}.",
+                _serverInstance.Key,
+                _baseUrl,
+                _branch);
+
+            return (await CommandHelper(_repoPath, "git", new[] {"fetch", _baseUrl, _branch}, cancel)).ExitCode == 0;
         }
 
         private async Task GitSwitchBranch(CancellationToken cancel = default)
@@ -132,36 +185,80 @@ namespace SS14.Watchdog.Components.Updates
 
         private async Task GitCheckedSubmoduleUpdate(CancellationToken cancel = default)
         {
+            _logger.LogInformation("Updating git submodules for {Key}.", _serverInstance.Key);
+
             await CommandHelperChecked("Failed submodule update!", _repoPath, "git", new[] {"submodule", "update", "--init", "--depth=1", "--recursive"}, cancel);
         }
 
         private async Task GitResetToFetchHead(CancellationToken cancel = default)
         {
+            _logger.LogInformation("Resetting git repository for {Key} to fetched HEAD.", _serverInstance.Key);
+
             await CommandHelperChecked("Failed reset to fetch-head", _repoPath, "git", new[] {"reset", "--hard", "FETCH_HEAD"}, cancel);
         }
 
         private async Task TryClone(CancellationToken cancel = default)
         {
-            _logger.LogTrace("Cloning git repository...");
+            _logger.LogInformation(
+                "Cloning git repository for {Key} from {Repository} branch {Branch} into {Path}.",
+                _serverInstance.Key,
+                _baseUrl,
+                _branch,
+                _repoPath);
 
-            if(Directory.Exists(_repoPath))
-                Directory.Delete(_repoPath, true);
+            if (Directory.Exists(_repoPath))
+                await DeleteDirectoryWithRetry(_repoPath, cancel);
 
             try
             {
                 // NOTE: These are expected to prepare everything including submodules,
                 // because this is used for orbital nuking in the event of an update issue.
                 // The --depth=1 is a performance cheat. Works though.
-                await CommandHelperChecked("Failed initial clone!", "", "git", new[] {"clone", "--depth=1", _baseUrl, _repoPath}, cancel);
+                await CommandHelperChecked("Failed initial clone!", "", "git", new[] {"clone", "--depth=1", "--branch", _branch, _baseUrl, _repoPath}, cancel);
                 await GitFetchOrigin(cancel);
                 await GitResetToFetchHead(cancel);
                 await GitCheckedSubmoduleUpdate(cancel);
+
+                _logger.LogInformation("Finished cloning git repository for {Key}.", _serverInstance.Key);
             }
             catch (Exception)
             {
-                if(Directory.Exists(_repoPath))
-                    Directory.Delete(_repoPath, true);
+                if (Directory.Exists(_repoPath))
+                    await DeleteDirectoryWithRetry(_repoPath, cancel);
                 throw;
+            }
+        }
+
+        private async Task DeleteDirectoryWithRetry(string path, CancellationToken cancel)
+        {
+            const int attempts = 5;
+
+            for (var i = 1; i <= attempts; i++)
+            {
+                try
+                {
+                    Directory.Delete(path, true);
+                    return;
+                }
+                catch (Exception e) when (i < attempts && e is IOException or UnauthorizedAccessException)
+                {
+                    _logger.LogWarning(
+                        e,
+                        "Failed to delete git source directory {Path} on attempt {Attempt}/{Attempts}; retrying.",
+                        path,
+                        i,
+                        attempts);
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(500 * i), cancel);
+                }
+                catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                {
+                    _logger.LogError(
+                        e,
+                        "Failed to delete git source directory {Path}. A previous git process may still have files open.",
+                        path);
+                    throw;
+                }
             }
         }
 
@@ -175,6 +272,39 @@ namespace SS14.Watchdog.Components.Updates
             {
                 return null;
             }
+        }
+
+        public override async Task<bool> TryWriteFirstRunConfigAsync(string configFile, CancellationToken cancel = default)
+        {
+            var sourceConfig = GetFirstRunConfigTemplatePath();
+            if (sourceConfig == null)
+            {
+                _logger.LogInformation(
+                    "No git repository server_config.toml template found for {Key}; creating an empty config.toml instead.",
+                    _serverInstance.Key);
+                return false;
+            }
+
+            _logger.LogInformation(
+                "Creating first-run config for {Key} from git repository template {SourceConfig}.",
+                _serverInstance.Key,
+                sourceConfig);
+
+            await using var source = File.OpenRead(sourceConfig);
+            await using var destination = File.Create(configFile);
+            await source.CopyToAsync(destination, cancel);
+            return true;
+        }
+
+        private string? GetFirstRunConfigTemplatePath()
+        {
+            var candidates = new[]
+            {
+                Path.Combine(_repoPath, "Content.Server", "server_config.toml"),
+                Path.Combine(_repoPath, "bin", "Content.Server", "server_config.toml")
+            };
+
+            return candidates.FirstOrDefault(File.Exists);
         }
 
         // Updater and checker
@@ -199,7 +329,12 @@ namespace SS14.Watchdog.Components.Updates
                 update = true;
             }
 
-            _logger.LogInformation($"Update check: {head ?? "No head"}, {fetchHead ?? "No fetch-head"} - updating: {update}");
+            _logger.LogInformation(
+                "Git update check for {Key}: head={Head}, fetchHead={FetchHead}, updating={Update}",
+                _serverInstance.Key,
+                head ?? "No head",
+                fetchHead ?? "No fetch-head",
+                update);
             return update;
         }
 
@@ -224,16 +359,20 @@ namespace SS14.Watchdog.Components.Updates
                 {
                     try
                     {
-                        // Don't allow these to be cancelled as they could probably corrupt the repository.
                         if (!(await GitFetchOrigin(cancel)))
                             throw new Exception("Could not fetch origin");
+                        var fetchedHead = await GitHead("FETCH_HEAD");
+                        _logger.LogInformation(
+                            "Fetched git branch {Branch} for {Key} at {FetchedHead}.",
+                            _branch,
+                            _serverInstance.Key,
+                            fetchedHead ?? "No fetch-head");
                         await GitResetToFetchHead(cancel);
                         await GitCheckedSubmoduleUpdate(cancel);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning($"Failed git submodule update: {ex}");
-                        _logger.LogWarning($"Nuking the repository from orbit to recover!");
+                        _logger.LogWarning(ex, "Failed to update git repository, recloning to recover.");
                         await TryClone(cancel);
                     }
                 }
@@ -242,7 +381,9 @@ namespace SS14.Watchdog.Components.Updates
                 if (actualConfirmedHead == null)
                     throw new Exception("Head disappeared!");
 
-                _logger.LogDebug($"Went from {currentVersion} to {actualConfirmedHead}");
+                _logger.LogDebug("Git update moved from {CurrentVersion} to {NewVersion}",
+                    currentVersion,
+                    actualConfirmedHead);
 
                 // Now we build and package it.
 
@@ -376,6 +517,8 @@ namespace SS14.Watchdog.Components.Updates
                 return null;
             }
         }
+
+        private sealed record CommandResult(int ExitCode, string Stdout, string Stderr);
 
         private class Build
         {

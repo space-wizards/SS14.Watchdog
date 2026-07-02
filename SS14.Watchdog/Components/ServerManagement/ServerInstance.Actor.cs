@@ -48,31 +48,37 @@ public sealed partial class ServerInstance
     {
         _baseServerAddress = baseServerAddress;
 
-        _logger.LogDebug("Starting server {Key}", Key);
-
-        await TryLoadPersistedProcess(cancel);
-        await _commandQueue.Writer.WriteAsync(new CommandStart(), cancel);
-
-        try
+        using (_logger.BeginScope(new Dictionary<string, object>
+               {
+                   ["Instance"] = Key
+               }))
         {
-            await CommandLoop(cancel);
+            _logger.LogDebug("Starting server {Key}", Key);
 
-            // Currently no way for this to be reachable, as shutdown is always caused by cancellation.
-        }
-        catch (OperationCanceledException)
-        {
-            // Nada, expected shutdown sequence.
-        }
-        catch (Exception e)
-        {
-            // Oh fuck.
-            _logger.LogCritical(e, "Exception occurred in server instance loop!");
-        }
-        finally
-        {
-            // Whether clean or unclear, run shutdown logic to the best of our abilities.
+            await TryLoadPersistedProcess(cancel);
+            await _commandQueue.Writer.WriteAsync(new CommandStart(), cancel);
 
-            await ShutdownAsync();
+            try
+            {
+                await CommandLoop(cancel);
+
+                // Currently no way for this to be reachable, as shutdown is always caused by cancellation.
+            }
+            catch (OperationCanceledException)
+            {
+                // Nada, expected shutdown sequence.
+            }
+            catch (Exception e)
+            {
+                // Oh fuck.
+                _logger.LogCritical(e, "Exception occurred in server instance loop!");
+            }
+            finally
+            {
+                // Whether clean or unclear, run shutdown logic to the best of our abilities.
+
+                await ShutdownAsync();
+            }
         }
     }
 
@@ -307,9 +313,11 @@ public sealed partial class ServerInstance
         {
             _updateOnRestart = false;
 
-            await StartRunUpdate(cancel);
+            if (!await StartRunUpdate(cancel))
+                return;
         }
 
+        await EnsureFirstRunFiles(cancel);
         GenerateNewToken();
 
         {
@@ -328,6 +336,9 @@ public sealed partial class ServerInstance
 
         _logger.LogTrace("Getting launch info...");
 
+        var configFile = Path.Combine(InstanceDir, "config.toml");
+        var dataDir = Path.Combine(InstanceDir, "data");
+
         var args = new List<string>
         {
             // Watchdog comms config.
@@ -336,8 +347,8 @@ public sealed partial class ServerInstance
             // watchdog.token provided through ENV vars, as this does not show up in process listings
             // like `ps -aux` or `htop`.
 
-            "--config-file", Path.Combine(InstanceDir, "config.toml"),
-            "--data-dir", Path.Combine(InstanceDir, "data"),
+            "--config-file", configFile,
+            "--data-dir", dataDir,
         };
 
         // Prepare the user provided arguments
@@ -373,7 +384,11 @@ public sealed partial class ServerInstance
             args,
             env);
 
-        _logger.LogTrace("Launching...");
+        _logger.LogInformation(
+            "Launching server {Key}",
+            Key);
+
+        _logger.LogDebug("Launching...");
         try
         {
             _runningServer = await _processManager.StartServer(this, startData, cancel);
@@ -386,6 +401,27 @@ public sealed partial class ServerInstance
 
         MonitorServer(_startNumber, cancel);
         StartTimeoutTimer();
+    }
+
+    private async Task EnsureFirstRunFiles(CancellationToken cancel)
+    {
+        Directory.CreateDirectory(Path.Combine(InstanceDir, "data"));
+        Directory.CreateDirectory(Path.Combine(InstanceDir, "binaries"));
+        Directory.CreateDirectory(Path.Combine(InstanceDir, "logs"));
+        Directory.CreateDirectory(Path.Combine(InstanceDir, "dumps"));
+
+        var configFile = Path.Combine(InstanceDir, "config.toml");
+        if (!File.Exists(configFile))
+        {
+            if (_updateProvider != null &&
+                await _updateProvider.TryWriteFirstRunConfigAsync(configFile, cancel))
+            {
+                return;
+            }
+
+            _logger.LogInformation("No config.toml found for {Key}, creating empty {ConfigFile}", Key, configFile);
+            await File.WriteAllTextAsync(configFile, "", cancel);
+        }
     }
 
     private string GetProgramPath()
@@ -421,10 +457,10 @@ public sealed partial class ServerInstance
         }
     }
 
-    private async Task StartRunUpdate(CancellationToken cancel)
+    private async Task<bool> StartRunUpdate(CancellationToken cancel)
     {
         if (_updateProvider == null)
-            return;
+            return true;
 
         bool hasUpdate;
         try
@@ -436,11 +472,11 @@ public sealed partial class ServerInstance
         catch (Exception e)
         {
             _logger.LogError(e, "Error while checking for update!");
-            return;
+            return true;
         }
 
         if (!hasUpdate)
-            return;
+            return true;
 
         _logger.LogTrace("Starting update...");
         string? newRevision;
@@ -454,7 +490,7 @@ public sealed partial class ServerInstance
         catch (Exception e)
         {
             _logger.LogError(e, "Uncaught error while updating server");
-            return;
+            return false;
         }
 
         if (newRevision != null)
@@ -466,11 +502,11 @@ public sealed partial class ServerInstance
             _loadFailCount = 0;
             _currentRevision = newRevision;
             SaveData();
+            return true;
         }
-        else
-        {
-            _logger.LogError("Failed to update!");
-        }
+
+        _logger.LogError("Failed to update; not starting server because required binaries may be missing or stale.");
+        return false;
     }
 
     /// <summary>

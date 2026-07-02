@@ -5,6 +5,7 @@
         <Nullable>enable</Nullable>
         <Version>0.3.0</Version>
         <ServerGarbageCollection>false</ServerGarbageCollection>
+        <DefaultItemExcludes>$(DefaultItemExcludes);instances\**</DefaultItemExcludes>
     </PropertyGroup>
 
     <ItemGroup>
@@ -16,15 +17,27 @@
       <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
       <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
       <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+      <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
       <PackageReference Include="Serilog.Sinks.Loki" Version="3.0.1-beta1" />
+      <PackageReference Include="System.Resources.Extensions" Version="10.0.0" />
       <PackageReference Include="Dapper" Version="2.1.66" />
       <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
+      <PackageReference Include="Serilog.Sinks.Map" Version="2.0.0" />
       <PackageReference Include="Tmds.DBus" Version="0.23.0" />
     </ItemGroup>
 
     <ItemGroup>
       <None Update="appsettings.yml">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="appsettings.Local.yml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="appsettings.Starter.yml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="appsettings.Development.yml">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </None>
         <Content Remove="Utility\runtime.json" />
         <EmbeddedResource Include="Utility\runtime.json">

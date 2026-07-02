@@ -43,6 +43,11 @@ namespace SS14.Watchdog.Components.Updates
             return Enumerable.Empty<KeyValuePair<string, string>>();
         }
 
+        public virtual Task<bool> TryWriteFirstRunConfigAsync(string configFile, CancellationToken cancel = default)
+        {
+            return Task.FromResult(false);
+        }
+
         [Pure]
         protected static string GetHostSS14RID()
         {

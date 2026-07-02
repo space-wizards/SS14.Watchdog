@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace SS14.Watchdog.Components.Updates
 {
     /// <summary>
-    ///     Pretends an update is always available.
+    /// Test provider that always reports an update and advances the recorded revision without copying files.
     /// </summary>
     public sealed class UpdateProviderDummy : UpdateProvider
     {
