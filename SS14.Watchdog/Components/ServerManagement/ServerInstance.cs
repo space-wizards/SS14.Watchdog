@@ -402,7 +402,7 @@ namespace SS14.Watchdog.Components.ServerManagement
             ProcessExitStatus? status;
             try
             {
-                await proc.WaitForExitAsync(cancel);
+                await proc.WaitForExitAsync(waitCts.Token);
                 status = await proc.GetExitStatusAsync();
             }
             catch (OperationCanceledException)
