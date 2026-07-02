@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.AspNetCore.Mvc;
 
@@ -19,7 +20,18 @@ namespace SS14.Watchdog.Utility
                 return false;
             }
 
-            var split = Base64Util.Utf8Base64ToString(authorization[6..]).Split(':');
+            string decoded;
+            try
+            {
+                decoded = Base64Util.Utf8Base64ToString(authorization[6..]);
+            }
+            catch (FormatException)
+            {
+                failure = new BadRequestResult();
+                return false;
+            }
+
+            var split = decoded.Split(':');
 
             if (split.Length != 2)
             {
