@@ -6,7 +6,7 @@ namespace SS14.Watchdog.Utility
 {
     public static class AuthorizationUtility
     {
-        public static bool TryParseBasicAuthentication(string? authorization,
+        public static bool TryParseBasicAuthentication(string authorization,
             [NotNullWhen(false)] out IActionResult? failure,
             [NotNullWhen(true)] out string? username,
             [NotNullWhen(true)] out string? password)
@@ -14,7 +14,7 @@ namespace SS14.Watchdog.Utility
             username = null;
             password = null;
 
-            if (authorization == null || !authorization.StartsWith("Basic "))
+            if (!authorization.StartsWith("Basic "))
             {
                 failure = new UnauthorizedResult();
                 return false;
