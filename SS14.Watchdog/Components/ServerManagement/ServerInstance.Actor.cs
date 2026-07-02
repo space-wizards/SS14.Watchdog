@@ -382,6 +382,8 @@ public sealed partial class ServerInstance
         catch (Exception e)
         {
             _logger.LogError(e, "Exception while launching!");
+            _notificationManager.SendNotification($"Server `{Key}` failed to launch. Check watchdog logs for possible causes.");
+            return;
         }
 
         MonitorServer(_startNumber, cancel);
