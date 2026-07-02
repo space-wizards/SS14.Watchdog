@@ -12,14 +12,16 @@
       <PackageReference Include="Microsoft.Diagnostics.NETCore.Client" Version="0.2.661903" />
       <PackageReference Include="Mono.Posix.NETStandard" Version="1.0.0" />
       <PackageReference Include="NetEscapades.Configuration.Yaml" Version="3.1.0" />
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
       <PackageReference Include="Serilog" Version="4.3.0" />
       <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
       <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
       <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
       <PackageReference Include="Serilog.Sinks.Loki" Version="3.0.1-beta1" />
       <PackageReference Include="Dapper" Version="2.1.66" />
-      <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.2" />
-      <PackageReference Include="Tmds.DBus" Version="0.23.0" />
+      <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />
+      <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
+      <PackageReference Include="Tmds.DBus" Version="0.94.2" />
     </ItemGroup>
 
     <ItemGroup>
