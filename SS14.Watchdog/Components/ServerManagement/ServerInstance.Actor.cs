@@ -191,6 +191,9 @@ public sealed partial class ServerInstance
         _updateOnRestart = command.UpdateAvailable;
         if (command.UpdateAvailable)
         {
+            // Should send an update regardless of what the server's state is.
+            await _notificationManager.SendHttpNotification(Key);
+
             if (IsRunning)
             {
                 _logger.LogTrace("Server is running, sending update notification.");

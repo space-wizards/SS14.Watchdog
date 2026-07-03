@@ -68,7 +68,7 @@ namespace SS14.Watchdog
 
             services.AddSingleton<NotificationManager>();
 
-            services.AddHttpClient(NotificationManager.DiscordHttpClient);
+            services.AddHttpClient(NotificationManager.NotificationHttpClient);
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
