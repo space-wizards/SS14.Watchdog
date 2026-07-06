@@ -12,11 +12,8 @@ using SS14.Watchdog.Utility;
 namespace SS14.Watchdog.Components.Updates
 {
     /// <summary>
-    /// Fetches the last successful Jenkins build for a configured job, downloads the current platform's
-    /// server zip from that build's release artifacts, and applies it as the instance's server binaries.
-    /// Use this for legacy Jenkins-based publishing pipelines.
+    ///     Downloads updates from a Jenkins job.
     /// </summary>
-    /// <seealso cref="UpdateProviderJenkinsConfiguration"/>
     public sealed class UpdateProviderJenkins : UpdateProvider
     {
         private readonly HttpClient _httpClient = new HttpClient();

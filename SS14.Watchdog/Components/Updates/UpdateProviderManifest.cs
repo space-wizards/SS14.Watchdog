@@ -18,12 +18,8 @@ using SS14.Watchdog.Utility;
 namespace SS14.Watchdog.Components.Updates
 {
     /// <summary>
-    /// Fetches a build manifest, selects the newest listed build, downloads the compatible server zip for
-    /// the current runtime identifier, verifies its SHA-256 hash, and applies it as the instance's server
-    /// binaries. Use this when a publishing pipeline produces an SS14-style manifest with platform-specific
-    /// server artifacts.
+    ///     Downloads updates from a build manifest. See Content.Packaging
     /// </summary>
-    /// <seealso cref="UpdateProviderManifestConfiguration"/>
     public sealed class UpdateProviderManifest : UpdateProvider
     {
         private const int DownloadTimeoutSeconds = 120;
