@@ -2,6 +2,10 @@
 
 SS14.Watchdog is SS14's server-hosting wrapper thing, similar to [TGS](https://github.com/tgstation/tgstation-server) for BYOND (but much simpler for the time being). It handles auto updates, monitoring, automatic restarts, and administration. We recommend you use this for proper deployments.
 
+If you wish to setup a server for long-term consult the [long-term hosting](#long-term-hosting) section before continuing.
+
+For the verbose guide see [the docs wiki](http://docs.spacestation14.com/en/server-hosting/setting-up-ss14-watchdog.html)
+
 ## Local server
 
 `appsettings.yml` is intentionally minimal and mostly a dummy/default config.
@@ -22,7 +26,7 @@ Then start Watchdog with one of the starter scripts:
 The starter config uses the `Git` update provider. The starter script will clone the target repository into SS14.Watchdog/instances/\<instance_name>
 
 After it has run once you will see a config.toml that you can adjust to set the CVars to your liking.
-For the full list of available CVars you will need to browse the development repository of your target server. Look for CCVars and CVars with Server flags.
+For the full list of available CVars you will need to browse the development repository of your target server. Look for [CCVars](https://github.com/space-wizards/space-station-14/tree/master/Content.Shared/CCVar) and [CVars](https://github.com/space-wizards/RobustToolbox/blob/master/Robust.Shared/CVars.cs) with Server flags.
 
 Per-instance watchdog logs are written to `logs/<instance>/watchdog-*.log`.
 
@@ -35,7 +39,7 @@ If an update is available, Watchdog tells the game server to shut down, applies 
 
 ## Update providers
 
-Each server instance chooses its own update provider with `Servers:Instances:<key>:UpdateType` and an optional `Updates` section. Different instances can use different providers.
+Each server instance chooses its own update provider with `Servers:Instances:<key>:UpdateType` and an optional `Updates` section. Different instances can use different providers. This is useful if you wish to host different forks with the same watchdog; Robust.Cdn supports this configuration.
 
 ### Manifest
 
@@ -132,6 +136,10 @@ Use `Dummy` only for tests or manual experiments. It always reports an update an
 
 ## Long-term hosting
 
-For long-term public hosting, prefer a release pipeline that publishes builds and use `Manifest` updates instead of building from `Git` on the host. See https://github.com/space-wizards/Robust.Cdn for manifest hosting.
+For long-term public hosting, prefer a release pipeline that publishes builds and use `Manifest` updates instead of building from `Git` on the host.
+- See https://github.com/space-wizards/Robust.Cdn for manifest hosting.
+- See Content.Packaging on https://github.com/space-wizards/space-station-14 for building the client manifests.
 
 Use a real database for production game server data. The generated starter `config.toml` defaults are suitable for getting a server running, but public or persistent servers should configure PostgreSQL in `config.toml` instead of relying on local SQLite files.
+
+Note that there is no easy way to convert SQLite files to Postgres and you risk data-loss if you try.
