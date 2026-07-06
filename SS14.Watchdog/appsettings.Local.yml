@@ -30,7 +30,7 @@ Process:
   LaunchInNewWindow: true
 
 Servers:
-  InstanceRoot: "bin/instances"
+  InstanceRoot: "instances"
   Instances:
     local_one:
       Name: "Local One"
