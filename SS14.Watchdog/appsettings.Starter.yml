@@ -31,7 +31,7 @@ Process:
   LaunchInNewWindow: true
 
 Servers:
-  InstanceRoot: "instances"
+  InstanceRoot: "bin/instances"
   Instances:
     main:
       Name: "My SS14 Server"
