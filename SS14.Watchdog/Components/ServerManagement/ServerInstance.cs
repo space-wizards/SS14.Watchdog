@@ -38,7 +38,27 @@ namespace SS14.Watchdog.Components.ServerManagement
         [JsonIgnore]
         public string? ApiToken => _instanceConfig.ApiToken;
 
-        public bool IsRunning => _runningServer != null;
+        public bool IsRunning
+        {
+            get
+            {
+                var result = _runningServer != null;
+                if (_runningServer != null)
+                {
+                    var exitStatus = _runningServer.GetExitStatusAsync().GetAwaiter().GetResult();
+                    if (exitStatus != null)
+                    {
+                        result = false;
+                        _runningServer = null;
+                    }
+                }
+                if (result == _stopped)
+                {
+                    throw new InvalidOperationException($"IsRunning state mismatch: {result} vs {_stopped}");
+                }
+                return result;
+            }
+        }
 
         /// <summary>
         ///     How long since the last ping before we consider the server "dead" and forcefully terminate it.
