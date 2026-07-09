@@ -123,6 +123,25 @@ namespace SS14.Watchdog
             services.AddSingleton<NotificationManager>();
 
             services.AddHttpClient(NotificationManager.DiscordHttpClient);
+
+            // CORS
+            var allowedOrigins = Configuration
+                .GetSection("Cors:AllowedOrigins")
+                .Get<string[]>() ?? Array.Empty<string>();
+
+            services.AddCors(options =>
+            {
+                options.AddPolicy("ConfiguredCors", builder =>
+                {
+                    if (allowedOrigins.Length > 0)
+                    {
+                        builder
+                            .WithOrigins(allowedOrigins)
+                            .AllowAnyHeader()
+                            .AllowAnyMethod();
+                    }
+                });
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -176,6 +195,8 @@ namespace SS14.Watchdog
             }
 
             app.UseRouting();
+
+            app.UseCors("ConfiguredCors");
 
             app.UseAuthentication();
 
