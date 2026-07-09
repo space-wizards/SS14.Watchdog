@@ -197,7 +197,8 @@ namespace SS14.Watchdog.Components.ServerManagement
                     _ => 2
                 })
                 .Select(x => x.Address)
-                .First();
+                .First()
+                .Replace("[::]", "localhost", StringComparison.Ordinal);
         }
     }
 }
