@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -32,7 +33,9 @@ namespace SS14.Watchdog.Components.ServerManagement
         private const int LoadFailMax = 3;
 
         public string Key { get; }
+        [JsonIgnore]
         public string? Secret { get; private set; }
+        [JsonIgnore]
         public string? ApiToken => _instanceConfig.ApiToken;
 
         public bool IsRunning => _runningServer != null;

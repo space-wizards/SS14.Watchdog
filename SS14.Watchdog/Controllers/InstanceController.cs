@@ -19,6 +19,18 @@ namespace SS14.Watchdog.Controllers
             _serverManager = serverManager;
         }
 
+        [HttpGet]
+        [Authorize(Policy = "BasicAuthentication")]
+        public IActionResult Get([FromHeader(Name = "Authorization")] string authorization, [FromRoute] string key)
+        {
+            if (!TryAuthorize(authorization, key, out var failure, out var instance))
+            {
+                return failure;
+            }
+
+            return Ok(instance);
+        }
+
         [HttpPost("restart")]
         [Authorize(Policy = "BasicAuthentication")]
         public async Task<IActionResult> Restart([FromHeader(Name = "Authorization")] string authorization, [FromRoute] string key)
