@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace SS14.Watchdog.Controllers
 {
-    [Controller]
+    [ApiController]
     [Route("/watchdog")]
     public class WatchdogController : ControllerBase
     {

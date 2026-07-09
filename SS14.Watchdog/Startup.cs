@@ -1,13 +1,20 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime;
+using System.Threading.Tasks;
 using JetBrains.Annotations;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
 using Serilog;
 using SS14.Watchdog.Components.BackgroundTasks;
 using SS14.Watchdog.Components.DataManagement;
@@ -15,6 +22,7 @@ using SS14.Watchdog.Components.Notifications;
 using SS14.Watchdog.Components.ProcessManagement;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Configuration;
+using SS14.Watchdog.Controllers;
 
 namespace SS14.Watchdog
 {
@@ -50,13 +58,59 @@ namespace SS14.Watchdog
                 case ProcessMode.Systemd:
                     services.Configure<SystemdProcessOptions>(processSection);
                     services.AddSingleton<IProcessManager, ProcessManagerSystemd>();
-                    services.AddHostedService(p => (ProcessManagerSystemd) p.GetService<IProcessManager>()!);
+                    services.AddHostedService(p => (ProcessManagerSystemd)p.GetService<IProcessManager>()!);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException($"Invalid process mode: {processOptions.Mode}");
             }
 
+            services.AddAuthentication("BasicAuthentication")
+                .AddScheme<AuthenticationSchemeOptions, BasicAuthenticationHandler>("BasicAuthentication", null);
+
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("BasicAuthentication", policy => policy.RequireAuthenticatedUser());
+            });
+
             services.AddControllers();
+            services.AddOpenApi(options =>
+            {
+                options.AddDocumentTransformer((document, context, cancellationToken) =>
+                {
+                    document.Components ??= new OpenApiComponents();
+                    document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+                    document.Components.SecuritySchemes["basicAuth"] = new OpenApiSecurityScheme
+                    {
+                        Type = SecuritySchemeType.Http,
+                        Scheme = "basic",
+                        Description = "Set the Authorization header to 'Basic <token>' using the raw base64-encoded token value."
+                    };
+
+                    return Task.FromResult(document);
+                });
+
+                options.AddOperationTransformer((operation, context, cancellationToken) =>
+                {
+                    var endpoint = context.Description.ActionDescriptor.EndpointMetadata
+                        .OfType<Microsoft.AspNetCore.Authorization.IAuthorizeData>()
+                        .FirstOrDefault(x => x.Policy == "BasicAuthentication");
+
+                    if (endpoint == null)
+                    {
+                        return Task.FromResult(operation);
+                    }
+
+                    operation.Security = new List<OpenApiSecurityRequirement>
+                    {
+                        new()
+                        {
+                            [new OpenApiSecuritySchemeReference("basicAuth", context.Document, "SecurityScheme")] = new List<string>()
+                        }
+                    };
+
+                    return Task.FromResult(operation);
+                });
+            });
 
             services.AddSingleton<ServerManager>();
             services.AddSingleton<IServerManager>(p => p.GetService<ServerManager>()!);
@@ -113,6 +167,11 @@ namespace SS14.Watchdog
                         FileProvider = provider,
                         RequestPath = path
                     });
+
+                    app.UseSwaggerUI(options =>
+                    {
+                        options.SwaggerEndpoint("/openapi/v1.json", "v1");
+                    });
                 }
             }
 
@@ -122,7 +181,11 @@ namespace SS14.Watchdog
 
             app.UseAuthorization();
 
-            app.UseEndpoints(endpoints => { endpoints.MapControllers(); });
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapOpenApi("/openapi/{documentName}.json");
+                endpoints.MapControllers();
+            });
         }
     }
 }
