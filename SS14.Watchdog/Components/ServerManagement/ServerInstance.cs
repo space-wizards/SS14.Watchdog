@@ -403,13 +403,14 @@ namespace SS14.Watchdog.Components.ServerManagement
                 var shutdownCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
                 // Give it 5 seconds to respond.
                 shutdownCts.CancelAfter(5000);
-                await SendShutdownNotificationAsync(shutdownCts.Token);
-            }
-            catch (HttpRequestException e)
-            {
-                _logger.LogInformation(e, "Exception sending shutdown notification to server. Killing.");
-                await proc.Kill();
-                return;
+                try
+                {
+                    await SendShutdownNotificationAsync(shutdownCts.Token);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogInformation(e, "Could not send shutdown notification to server. Proceeding to kill.");
+                }
             }
             catch (OperationCanceledException)
             {

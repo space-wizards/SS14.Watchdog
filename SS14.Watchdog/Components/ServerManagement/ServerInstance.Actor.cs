@@ -128,7 +128,18 @@ public sealed partial class ServerInstance
 
         await foreach (var command in _commandQueue.Reader.ReadAllAsync(cancel))
         {
-            await RunCommand(command, cancel);
+            try
+            {
+                await RunCommand(command, cancel);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing command for {Key}", Key);
+            }
         }
     }
 
