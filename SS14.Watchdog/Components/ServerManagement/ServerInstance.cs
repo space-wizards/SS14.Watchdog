@@ -52,10 +52,6 @@ namespace SS14.Watchdog.Components.ServerManagement
                         _runningServer = null;
                     }
                 }
-                if (result == _stopped)
-                {
-                    throw new InvalidOperationException($"IsRunning state mismatch: {result} vs {_stopped}");
-                }
                 return result;
             }
         }
