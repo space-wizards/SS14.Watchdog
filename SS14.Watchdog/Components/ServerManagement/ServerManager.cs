@@ -88,6 +88,12 @@ namespace SS14.Watchdog.Components.ServerManagement
             // Start server instances in background while main host loads.
             foreach (var instance in _instances.Values)
             {
+                if (!instance.AutoStart)
+                {
+                    _logger.LogInformation("Skipping auto-start for instance {Key}", instance.Key);
+                    continue;
+                }
+
                 tasks.Add(Task.Run(() => instance.StartAsync(baseAddress, stoppingToken), default));
             }
 

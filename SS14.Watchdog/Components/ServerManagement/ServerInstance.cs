@@ -56,6 +56,11 @@ namespace SS14.Watchdog.Components.ServerManagement
             }
         }
 
+            /// <summary>
+            /// Whether this instance should be started automatically when the watchdog starts.
+            /// </summary>
+            public bool AutoStart => _instanceConfig.AutoStart;
+
         /// <summary>
         ///     How long since the last ping before we consider the server "dead" and forcefully terminate it.
         /// </summary>
