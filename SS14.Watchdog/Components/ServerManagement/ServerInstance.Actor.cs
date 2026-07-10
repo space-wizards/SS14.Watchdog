@@ -184,6 +184,17 @@ public sealed partial class ServerInstance
     {
         // TODO: use stopCommand to indicate more extensive error message to error.
 
+        if (_stopped)
+        {
+            _logger.LogInformation("{Key}: stop requested again, forcefully terminating server", Key);
+            if (_runningServer != null)
+            {
+                await _runningServer.Kill();
+                _runningServer = null;
+            }
+            return;
+        }
+
         _stopped = true;
         if (IsRunning)
         {
