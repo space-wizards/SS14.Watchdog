@@ -166,28 +166,20 @@ public sealed partial class ServerInstance
 
     private async Task RunCommandRestart(CancellationToken cancel)
     {
-        if (_stopped)
-        {
-            _logger.LogDebug("Clearing stopped flag due to manual server restart");
-            _stopped = false;
-        }
+        _logger.LogDebug("Executing restart command for {Key}", Key);
+        _stopped = false;
+        _startupFailUpdateWait = false;
 
         if (_runningServer != null)
         {
-            await _runningServer.Kill();
+            await ForceShutdownServerAsync(cancel);
             _runningServer = null;
         }
 
-        if (_runningServer == null)
-        {
-            _loadFailCount = 0;
-            _startupFailUpdateWait = false;
-            await StartServer(cancel);
-            return;
-        }
-
-        await ForceShutdownServerAsync(cancel);
+        _loadFailCount = 0;
+        await StartServer(cancel);
     }
+
 
     private async Task RunCommandStop(ServerInstanceStopCommand stopCommand, CancellationToken cancel)
     {
