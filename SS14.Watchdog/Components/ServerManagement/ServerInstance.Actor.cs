@@ -51,7 +51,16 @@ public sealed partial class ServerInstance
         _logger.LogDebug("Starting server {Key}", Key);
 
         await TryLoadPersistedProcess(cancel);
-        await _commandQueue.Writer.WriteAsync(new CommandStart(), cancel);
+
+        // Only queue an automatic start if configured to auto-start and we don't already
+        // have a persisted running process. We still start the actor loop for all
+        // instances so they can accept commands such as Restart/Stop.
+        if (_runningServer == null && _instanceConfig.AutoStart)
+        {
+            await _commandQueue.Writer.WriteAsync(new CommandStart(), cancel);
+        } else if (!_instanceConfig.AutoStart) {
+            _logger.LogInformation("Instance {Key} is not configured to auto-start, skipping start command.", Key);
+        }
 
         try
         {
