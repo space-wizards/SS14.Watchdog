@@ -163,6 +163,12 @@ public sealed partial class ServerInstance
             _stopped = false;
         }
 
+        if (_runningServer != null)
+        {
+            await _runningServer.Kill();
+            _runningServer = null;
+        }
+
         if (_runningServer == null)
         {
             _loadFailCount = 0;
