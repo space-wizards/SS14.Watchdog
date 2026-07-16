@@ -25,7 +25,7 @@ jobs:
       - name: Publish
         run: |
           dotnet build --configuration Release --no-restore
-          dotnet publish --configuration Release --no-restore -o dist -r linux-x64 --self-contained false
+          dotnet publish --configuration Release --no-restore -o dist
       - name: Test
         run: dotnet test --no-restore --verbosity normal
       - name: Zip release
