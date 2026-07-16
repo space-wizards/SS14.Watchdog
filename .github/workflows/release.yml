@@ -10,6 +10,8 @@ jobs:
   release:
     permissions: write-all
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v6.0.1
         with:
@@ -23,7 +25,7 @@ jobs:
       - name: Publish
         run: |
           dotnet build --configuration Release --no-restore
-          dotnet publish --configuration Release --no-restore -o dist
+          dotnet publish --configuration Release --no-restore -o dist -r linux-x64 --self-contained false
       - name: Test
         run: dotnet test --no-restore --verbosity normal
       - name: Zip release
