@@ -20,12 +20,13 @@ jobs:
           dotnet-version: 10.0.x
       - name: Install dependencies
         run: dotnet restore
-      - name: Build
-        run: dotnet build --configuration Release --no-restore
+      - name: Publish
+        run: |
+          cd SS14.Watchdog
+          dotnet build --configuration Release --no-restore
+          dotnet publish --configuration Release --self-contained true --no-restore -r linux-x64 -o dist /p:UseAppHost=true
       - name: Test
         run: dotnet test --no-restore --verbosity normal
-      - name: Publish
-        run: dotnet publish --configuration Release --self-contained true --no-restore --output dist /p:UseAppHost=true
       - name: Zip release
         run: zip -r dist.zip dist
       - name: Create Release
