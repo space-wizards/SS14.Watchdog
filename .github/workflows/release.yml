@@ -1,14 +1,19 @@
-﻿on:
-  push:
-    tags:
-      - v*
+﻿name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create release for'
+        required: true
+        type: string
 jobs:
   release:
-    if: github.ref_name == 'master'
     permissions: write-all
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.1
+        with:
+          ref: ${{ github.event.inputs.tag }}
       - name: Setup .NET Core
         uses: actions/setup-dotnet@v5.1.0
         with:
@@ -24,4 +29,4 @@ jobs:
       - name: Zip release
         run: zip -r dist.zip dist
       - name: Create Release
-        run: gh release create ${GITHUB_REF#refs/*/} -t ${GITHUB_REF#refs/*/} dist.zip
+        run: gh release create "${{ github.event.inputs.tag }}" -t "${{ github.event.inputs.tag }}" dist.zip
