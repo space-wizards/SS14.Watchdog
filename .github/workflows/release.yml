@@ -22,7 +22,6 @@ jobs:
         run: dotnet restore
       - name: Publish
         run: |
-          cd SS14.Watchdog
           dotnet build --configuration Release --no-restore
           dotnet publish --configuration Release --no-restore -o dist
       - name: Test
