@@ -29,6 +29,8 @@ jobs:
       - name: Test
         run: dotnet test --no-restore --verbosity normal
       - name: Zip release
-        run: zip -r dist.zip dist
+        run: |
+          cd dist
+          zip -r ../dist.zip .
       - name: Create Release
         run: gh release create "${{ github.event.inputs.tag }}" -t "${{ github.event.inputs.tag }}" dist.zip
