@@ -4,6 +4,7 @@ using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
@@ -32,10 +33,33 @@ namespace SS14.Watchdog.Components.ServerManagement
         private const int LoadFailMax = 3;
 
         public string Key { get; }
+        [JsonIgnore]
         public string? Secret { get; private set; }
+        [JsonIgnore]
         public string? ApiToken => _instanceConfig.ApiToken;
 
-        public bool IsRunning => _runningServer != null;
+        public bool IsRunning
+        {
+            get
+            {
+                var result = _runningServer != null;
+                if (_runningServer != null)
+                {
+                    var exitStatus = _runningServer.GetExitStatusAsync().GetAwaiter().GetResult();
+                    if (exitStatus != null)
+                    {
+                        result = false;
+                        _runningServer = null;
+                    }
+                }
+                return result;
+            }
+        }
+
+            /// <summary>
+            /// Whether this instance should be started automatically when the watchdog starts.
+            /// </summary>
+            public bool AutoStart => _instanceConfig.AutoStart;
 
         /// <summary>
         ///     How long since the last ping before we consider the server "dead" and forcefully terminate it.
@@ -379,13 +403,14 @@ namespace SS14.Watchdog.Components.ServerManagement
                 var shutdownCts = CancellationTokenSource.CreateLinkedTokenSource(cancel);
                 // Give it 5 seconds to respond.
                 shutdownCts.CancelAfter(5000);
-                await SendShutdownNotificationAsync(shutdownCts.Token);
-            }
-            catch (HttpRequestException e)
-            {
-                _logger.LogInformation(e, "Exception sending shutdown notification to server. Killing.");
-                await proc.Kill();
-                return;
+                try
+                {
+                    await SendShutdownNotificationAsync(shutdownCts.Token);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogInformation(e, "Could not send shutdown notification to server. Proceeding to kill.");
+                }
             }
             catch (OperationCanceledException)
             {

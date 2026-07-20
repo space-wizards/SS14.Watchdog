@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SS14.Watchdog.Components.ServerManagement;
 using SS14.Watchdog.Utility;
@@ -7,8 +8,8 @@ using SIOFile = System.IO.File;
 
 namespace SS14.Watchdog.Controllers
 {
+    [ApiController]
     [Route("/instances/{key}")]
-    [Controller]
     public class InstanceController : ControllerBase
     {
         private readonly IServerManager _serverManager;
@@ -18,8 +19,21 @@ namespace SS14.Watchdog.Controllers
             _serverManager = serverManager;
         }
 
+        [HttpGet]
+        [Authorize(Policy = "BasicAuthentication")]
+        public IActionResult Get([FromHeader(Name = "Authorization")] string authorization, [FromRoute] string key)
+        {
+            if (!TryAuthorize(authorization, key, out var failure, out var instance))
+            {
+                return failure;
+            }
+
+            return Ok(instance);
+        }
+
         [HttpPost("restart")]
-        public async Task<IActionResult> Restart([FromHeader(Name = "Authorization")] string authorization, string key)
+        [Authorize(Policy = "BasicAuthentication")]
+        public async Task<IActionResult> Restart([FromHeader(Name = "Authorization")] string authorization, [FromRoute] string key)
         {
             if (!TryAuthorize(authorization, key, out var failure, out var instance))
             {
@@ -31,7 +45,8 @@ namespace SS14.Watchdog.Controllers
         }
 
         [HttpPost("stop")]
-        public async Task<IActionResult> Stop([FromHeader(Name = "Authorization")] string authorization, string key)
+        [Authorize(Policy = "BasicAuthentication")]
+        public async Task<IActionResult> Stop([FromHeader(Name = "Authorization")] string authorization, [FromRoute] string key)
         {
             if (!TryAuthorize(authorization, key, out var failure, out var instance))
             {
@@ -43,7 +58,8 @@ namespace SS14.Watchdog.Controllers
         }
 
         [HttpPost("update")]
-        public IActionResult Update([FromHeader(Name = "Authorization")] string authorization, string key)
+        [Authorize(Policy = "BasicAuthentication")]
+        public IActionResult Update([FromHeader(Name = "Authorization")] string authorization, [FromRoute] string key)
         {
             if (!TryAuthorize(authorization, key, out var failure, out var instance))
             {

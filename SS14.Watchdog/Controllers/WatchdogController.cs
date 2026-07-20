@@ -1,10 +1,12 @@
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
+using SS14.Watchdog.Components.ServerManagement;
 
 namespace SS14.Watchdog.Controllers
 {
-    [Controller]
+    [ApiController]
     [Route("/watchdog")]
-    public class WatchdogController : ControllerBase
+    public class WatchdogController(IServerManager serverManager) : ControllerBase
     {
         [HttpGet("padlock")]
         public IActionResult Padlock()
@@ -15,6 +17,12 @@ namespace SS14.Watchdog.Controllers
 ####
 ####
 ");
+        }
+
+        [HttpGet("instances")]
+        public async Task<IActionResult> Instances()
+        {
+            return Ok(serverManager.Instances);
         }
     }
 }

@@ -37,6 +37,11 @@ namespace SS14.Watchdog.Components.ServerManagement
         string InstanceDir { get; }
 
         /// <summary>
+        ///    Whether the server instance is currently running.
+        /// </summary>
+        bool IsRunning { get; }
+
+        /// <summary>
         ///     Server has sent a ping to the watchdog confirming that it is, in fact, still alive.
         /// </summary>
         Task PingReceived();

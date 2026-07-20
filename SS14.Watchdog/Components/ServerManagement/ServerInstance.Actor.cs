@@ -51,7 +51,16 @@ public sealed partial class ServerInstance
         _logger.LogDebug("Starting server {Key}", Key);
 
         await TryLoadPersistedProcess(cancel);
-        await _commandQueue.Writer.WriteAsync(new CommandStart(), cancel);
+
+        // Only queue an automatic start if configured to auto-start and we don't already
+        // have a persisted running process. We still start the actor loop for all
+        // instances so they can accept commands such as Restart/Stop.
+        if (_runningServer == null && _instanceConfig.AutoStart)
+        {
+            await _commandQueue.Writer.WriteAsync(new CommandStart(), cancel);
+        } else if (!_instanceConfig.AutoStart) {
+            _logger.LogInformation("Instance {Key} is not configured to auto-start, skipping start command.", Key);
+        }
 
         try
         {
@@ -119,7 +128,18 @@ public sealed partial class ServerInstance
 
         await foreach (var command in _commandQueue.Reader.ReadAllAsync(cancel))
         {
-            await RunCommand(command, cancel);
+            try
+            {
+                await RunCommand(command, cancel);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error processing command for {Key}", Key);
+            }
         }
     }
 
@@ -157,26 +177,35 @@ public sealed partial class ServerInstance
 
     private async Task RunCommandRestart(CancellationToken cancel)
     {
-        if (_stopped)
+        _logger.LogDebug("Executing restart command for {Key}", Key);
+        _stopped = false;
+        _startupFailUpdateWait = false;
+
+        if (_runningServer != null)
         {
-            _logger.LogDebug("Clearing stopped flag due to manual server restart");
-            _stopped = false;
+            await ForceShutdownServerAsync(cancel);
+            _runningServer = null;
         }
 
-        if (_runningServer == null)
-        {
-            _loadFailCount = 0;
-            _startupFailUpdateWait = false;
-            await StartServer(cancel);
-            return;
-        }
-
-        await ForceShutdownServerAsync(cancel);
+        _loadFailCount = 0;
+        await StartServer(cancel);
     }
+
 
     private async Task RunCommandStop(ServerInstanceStopCommand stopCommand, CancellationToken cancel)
     {
         // TODO: use stopCommand to indicate more extensive error message to error.
+
+        if (_stopped)
+        {
+            _logger.LogInformation("{Key}: stop requested again, forcefully terminating server", Key);
+            if (_runningServer != null)
+            {
+                await _runningServer.Kill();
+                _runningServer = null;
+            }
+            return;
+        }
 
         _stopped = true;
         if (IsRunning)
