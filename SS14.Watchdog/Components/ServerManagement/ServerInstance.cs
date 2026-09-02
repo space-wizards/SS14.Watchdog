@@ -368,26 +368,28 @@ namespace SS14.Watchdog.Components.ServerManagement
             await _commandQueue.Writer.WriteAsync(new CommandStop(stopCommand), cancel);
         }
 
-            public async Task<string?> DoRevertCommandAsync(string? targetVersion, bool immediate, CancellationToken cancel = default)
-            {
-                if (_updateProvider is not UpdateProviderManifest manifestProvider)
-                    return null;
+        public async Task<string?> DoRevertCommandAsync(string? targetVersion, bool immediate,
+            CancellationToken cancel = default)
+        {
+            if (_updateProvider is not UpdateProviderManifest manifestProvider)
+                return null;
 
-                var resolved = await manifestProvider.ResolveRevertTargetAsync(_currentRevision, targetVersion, cancel);
-                if (resolved == null)
-                    return null;
+            var resolved = await manifestProvider.ResolveRevertTargetAsync(_currentRevision, targetVersion, cancel);
+            if (resolved == null)
+                return null;
 
-                await _commandQueue.Writer.WriteAsync(new CommandRevert(resolved, immediate), cancel);
-                return resolved;
-            }
+            await _commandQueue.Writer.WriteAsync(new CommandRevert(resolved, immediate), cancel);
+            return resolved;
+        }
 
-            public async Task<IReadOnlyList<UpdateVersionInfo>?> GetRecentVersionsAsync(int count = 5, CancellationToken cancel = default)
-            {
-                if (_updateProvider is not UpdateProviderManifest manifestProvider)
-                    return null;
+        public async Task<IReadOnlyList<UpdateVersionInfo>?> GetRecentVersionsAsync(int count = 5,
+            CancellationToken cancel = default)
+        {
+            if (_updateProvider is not UpdateProviderManifest manifestProvider)
+                return null;
 
-                return await manifestProvider.GetRecentVersionsAsync(count, cancel);
-            }
+            return await manifestProvider.GetRecentVersionsAsync(count, cancel);
+        }
 
         public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
         {
