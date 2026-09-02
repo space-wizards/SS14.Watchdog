@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using SS14.Watchdog.Components.ServerManagement;
@@ -52,6 +53,52 @@ namespace SS14.Watchdog.Controllers
 
             instance.HandleUpdateCheck();
             return Ok();
+        }
+
+        [HttpPost("revert")]
+        public async Task<IActionResult> Revert(
+            [FromHeader(Name = "Authorization")] string authorization,
+            string key,
+            [FromQuery] string? version,
+            [FromQuery] bool immediate = false)
+        {
+            if (!TryAuthorize(authorization, key, out var failure, out var instance))
+            {
+                return failure;
+            }
+
+            var resolved = await instance.DoRevertCommandAsync(version, immediate);
+            if (resolved == null)
+            {
+                return BadRequest(
+                    "This instance does not support reverting, the specified version does not exist, or no earlier version is available.");
+            }
+
+            return Ok(new { version = resolved, immediate });
+        }
+
+        [HttpGet("versions")]
+        public async Task<IActionResult> Versions(
+            [FromHeader(Name = "Authorization")] string authorization,
+            string key)
+        {
+            if (!TryAuthorize(authorization, key, out var failure, out var instance))
+            {
+                return failure;
+            }
+
+            var versions = await instance.GetRecentVersionsAsync(5);
+            if (versions == null)
+            {
+                return BadRequest("This instance does not support version listing.");
+            }
+
+            return Ok(versions.Select(v => new
+            {
+                version = v.Version,
+                time = v.Time,
+                current = v.Version == instance.CurrentRevision
+            }));
         }
 
         [NonAction]

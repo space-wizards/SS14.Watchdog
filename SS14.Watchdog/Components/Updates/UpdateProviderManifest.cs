@@ -17,6 +17,8 @@ using SS14.Watchdog.Utility;
 
 namespace SS14.Watchdog.Components.Updates
 {
+    public sealed record UpdateVersionInfo(string Version, DateTimeOffset Time);
+
     public sealed class UpdateProviderManifest : UpdateProvider
     {
         private const int DownloadTimeoutSeconds = 120;
@@ -69,10 +71,69 @@ namespace SS14.Watchdog.Components.Updates
                 return null;
             }
 
-            var versionInfo = manifest.Builds[maxVersion];
-
             _logger.LogTrace("New version is {NewVersion} from {OldVersion}", maxVersion, currentVersion ?? "<none>");
 
+            return await DownloadAndInstallAsync(maxVersion, manifest.Builds[maxVersion], binPath, cancel);
+        }
+
+        public async Task<string?> RunUpdateToVersionAsync(
+            string targetVersion,
+            string binPath,
+            CancellationToken cancel = default)
+        {
+            var manifest = await FetchManifestInfoAsync(cancel);
+            if (manifest == null || !manifest.Builds.TryGetValue(targetVersion, out var versionInfo))
+            {
+                _logger.LogError("Requested revert target version {Version} not found in manifest", targetVersion);
+                return null;
+            }
+
+            return await DownloadAndInstallAsync(targetVersion, versionInfo, binPath, cancel);
+        }
+
+        public async Task<string?> ResolveRevertTargetAsync(
+            string? currentVersion,
+            string? explicitVersion,
+            CancellationToken cancel = default)
+        {
+            var manifest = await FetchManifestInfoAsync(cancel);
+            if (manifest == null)
+                return null;
+
+            if (explicitVersion != null)
+                return manifest.Builds.ContainsKey(explicitVersion) ? explicitVersion : null;
+
+            if (currentVersion == null || !manifest.Builds.TryGetValue(currentVersion, out var currentInfo))
+                return null;
+
+            return manifest.Builds
+                .Where(kv => kv.Value.Time < currentInfo.Time)
+                .OrderByDescending(kv => kv.Value.Time)
+                .Select(kv => kv.Key)
+                .FirstOrDefault();
+        }
+
+        public async Task<IReadOnlyList<UpdateVersionInfo>> GetRecentVersionsAsync(
+            int count,
+            CancellationToken cancel = default)
+        {
+            var manifest = await FetchManifestInfoAsync(cancel);
+            if (manifest == null)
+                return Array.Empty<UpdateVersionInfo>();
+
+            return manifest.Builds
+                .OrderByDescending(kv => kv.Value.Time)
+                .Take(count)
+                .Select(kv => new UpdateVersionInfo(kv.Key, kv.Value.Time))
+                .ToList();
+        }
+
+        private async Task<string?> DownloadAndInstallAsync(
+            string version,
+            VersionInfo versionInfo,
+            string binPath,
+            CancellationToken cancel)
+        {
             var rid = RidUtility.FindBestRid(versionInfo.Server.Keys);
 
             if (rid == null)
@@ -140,7 +201,7 @@ namespace SS14.Watchdog.Components.Updates
             tempFile.Seek(0, SeekOrigin.Begin);
             DoBuildExtract(tempFile, binPath);
 
-            return maxVersion;
+            return version;
         }
 
         private async Task<ManifestInfo?> FetchManifestInfoAsync(CancellationToken cancel)

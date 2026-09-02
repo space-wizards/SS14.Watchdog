@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using SS14.Watchdog.Components.Updates;
 
 namespace SS14.Watchdog.Components.ServerManagement
 {
@@ -29,6 +31,11 @@ namespace SS14.Watchdog.Components.ServerManagement
         ///     API token used to authenticate API requests to the watchdog concerning this server instance.
         /// </summary>
         string? ApiToken { get; }
+
+        /// <summary>
+        ///     The version currently running (or that will run on next start) for this instance.
+        /// </summary>
+        string? CurrentRevision { get; }
 
         /// <summary>
         ///     The root filesystem directory for the instance, which contains config file, data,
@@ -70,6 +77,23 @@ namespace SS14.Watchdog.Components.ServerManagement
         /// The server will be asked to gracefully shut down via the <c>/update</c> end point.
         /// </remarks>
         Task DoStopCommandAsync(ServerInstanceStopCommand stopCommand, CancellationToken cancel = default);
+
+        /// <summary>
+        /// Revert this instance to a specific manifest version, or to the version immediately before
+        /// the currently running one if <paramref name="targetVersion"/> is null.
+        /// Only supported for instances using Robust.CDN.
+        /// </summary>
+        /// <returns>
+        /// The resolved version that was queued to revert to, or null if this instance does not support
+        /// reverting, the requested version does not exist, or no earlier version is available.
+        /// </returns>
+        Task<string?> DoRevertCommandAsync(string? targetVersion, bool immediate, CancellationToken cancel = default);
+
+        /// <summary>
+        /// The most recent manifest versions, newest first, or null if this instance does not support
+        /// version listing.
+        /// </summary>
+        Task<IReadOnlyList<UpdateVersionInfo>?> GetRecentVersionsAsync(int count = 5, CancellationToken cancel = default);
     }
 
     /// <summary>

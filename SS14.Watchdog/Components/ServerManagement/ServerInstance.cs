@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Security.Cryptography;
@@ -34,6 +35,7 @@ namespace SS14.Watchdog.Components.ServerManagement
         public string Key { get; }
         public string? Secret { get; private set; }
         public string? ApiToken => _instanceConfig.ApiToken;
+        public string? CurrentRevision => _currentRevision;
 
         public bool IsRunning => _runningServer != null;
 
@@ -365,6 +367,27 @@ namespace SS14.Watchdog.Components.ServerManagement
         {
             await _commandQueue.Writer.WriteAsync(new CommandStop(stopCommand), cancel);
         }
+
+            public async Task<string?> DoRevertCommandAsync(string? targetVersion, bool immediate, CancellationToken cancel = default)
+            {
+                if (_updateProvider is not UpdateProviderManifest manifestProvider)
+                    return null;
+
+                var resolved = await manifestProvider.ResolveRevertTargetAsync(_currentRevision, targetVersion, cancel);
+                if (resolved == null)
+                    return null;
+
+                await _commandQueue.Writer.WriteAsync(new CommandRevert(resolved, immediate), cancel);
+                return resolved;
+            }
+
+            public async Task<IReadOnlyList<UpdateVersionInfo>?> GetRecentVersionsAsync(int count = 5, CancellationToken cancel = default)
+            {
+                if (_updateProvider is not UpdateProviderManifest manifestProvider)
+                    return null;
+
+                return await manifestProvider.GetRecentVersionsAsync(count, cancel);
+            }
 
         public async Task ForceShutdownServerAsync(CancellationToken cancel = default)
         {

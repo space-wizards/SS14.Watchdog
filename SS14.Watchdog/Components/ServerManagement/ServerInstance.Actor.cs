@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using SS14.Watchdog.Components.ProcessManagement;
+using SS14.Watchdog.Components.Updates;
 
 namespace SS14.Watchdog.Components.ServerManagement;
 
@@ -43,6 +44,8 @@ public sealed partial class ServerInstance
     private int _startNumber;
     // Server got an explicit stop command, will not be automatically restarted.
     private bool _stopped;
+
+    private string? _pendingRevertTarget;
 
     public async Task StartAsync(string baseServerAddress, CancellationToken cancel)
     {
@@ -150,6 +153,9 @@ public sealed partial class ServerInstance
             case CommandUpdateAvailable updateAvailable:
                 await RunCommandUpdateAvailable(updateAvailable, cancel);
                 break;
+            case CommandRevert revert:
+                await RunCommandRevert(revert, cancel);
+                break;
             default:
                 throw new InvalidOperationException($"Invalid command: {command}");
         }
@@ -206,6 +212,26 @@ public sealed partial class ServerInstance
                 _logger.LogInformation("Starting failed server after update.");
                 await StartServer(cancel);
             }
+        }
+    }
+
+    private async Task RunCommandRevert(CommandRevert command, CancellationToken cancel)
+    {
+        if (command.TargetVersion == _currentRevision)
+            return;
+
+        _pendingRevertTarget = command.TargetVersion;
+
+        if (IsRunning)
+        {
+            if (command.Immediate)
+                await ForceShutdownServerAsync(cancel);
+            else
+                await SendUpdateNotificationAsync(cancel);
+        }
+        else if (!_stopped)
+        {
+            await StartServer(cancel);
         }
     }
 
@@ -303,7 +329,15 @@ public sealed partial class ServerInstance
             return;
         }
 
-        if (_updateOnRestart)
+        if (_pendingRevertTarget != null)
+        {
+            var target = _pendingRevertTarget;
+            _pendingRevertTarget = null;
+            _updateOnRestart = false;
+
+            await StartRunRevert(target, cancel);
+        }
+        else if (_updateOnRestart)
         {
             _updateOnRestart = false;
 
@@ -473,6 +507,39 @@ public sealed partial class ServerInstance
         }
     }
 
+    private async Task StartRunRevert(string targetVersion, CancellationToken cancel)
+    {
+        if (_updateProvider is not UpdateProviderManifest manifestProvider)
+            return;
+
+        string? newRevision;
+        try
+        {
+            newRevision = await manifestProvider.RunUpdateToVersionAsync(
+                targetVersion,
+                Path.Combine(InstanceDir, "bin"),
+                cancel);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e, "Uncaught error while reverting server");
+            return;
+        }
+
+        if (newRevision != null)
+        {
+            _logger.LogDebug("Reverted from {Current} to {New}.", _currentRevision ?? "<none>", newRevision);
+
+            _loadFailCount = 0;
+            _currentRevision = newRevision;
+            SaveData();
+        }
+        else
+        {
+            _logger.LogError("{Key}: Failed to revert to {Version}!", Key, targetVersion);
+        }
+    }
+
     /// <summary>
     /// Base class for all commands that are executed by the server instance actor.
     /// </summary>
@@ -497,6 +564,11 @@ public sealed partial class ServerInstance
     /// Command to stop the server gracefully, without restarting it afterwards.
     /// </summary>
     private sealed record CommandStop(ServerInstanceStopCommand StopCommand) : Command;
+
+    /// <summary>
+    /// Command to revert the server to a specific (already-resolved) version.
+    /// </summary>
+    private sealed record CommandRevert(string TargetVersion, bool Immediate) : Command;
 
     /// <summary>
     /// The server has failed to ping back in time, grab the axe!
