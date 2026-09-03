@@ -55,6 +55,31 @@ namespace SS14.Watchdog.Controllers
             return Ok();
         }
 
+        /// <summary>
+        /// Reverts the specified server instance to a previous version or a specified target version.
+        /// Can be older or newer than the currently running version.
+        /// Only supported for instances using Robust.CDN.
+        /// </summary>
+        /// <param name="authorization">
+        /// The authorization header containing the credentials for the operation.
+        /// </param>
+        /// <param name="key">
+        /// The unique identifier of the server instance to revert.
+        /// </param>
+        /// <param name="version">
+        /// The optional target version to revert to. If null, the instance will revert
+        /// to the version immediately before the currently running one.
+        /// </param>
+        /// <param name="immediate">
+        /// A flag indicating whether the revert should occur immediately.
+        /// Defaults to false.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IActionResult"/> representing the result of the revert operation.
+        /// Returns a 400 status code if reverting is unsupported, the version does not exist,
+        /// or no earlier version is available. Otherwise, returns a 200 status code
+        /// with the resolved version and whether the revert was immediate.
+        /// </returns>
         [HttpPost("revert")]
         public async Task<IActionResult> Revert(
             [FromHeader(Name = "Authorization")] string authorization,

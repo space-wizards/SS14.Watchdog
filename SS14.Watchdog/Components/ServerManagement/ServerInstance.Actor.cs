@@ -215,6 +215,15 @@ public sealed partial class ServerInstance
         }
     }
 
+    /// <summary>
+    /// Processes the revert command to change the server's version to a specified target version.
+    /// Depending on the parameters, the server may be immediately stopped, restarted, or sent an update notification.
+    /// </summary>
+    /// <param name="command">The revert command containing the target version and whether the change should occur immediately.</param>
+    /// <param name="cancel">
+    /// An optional <see cref="CancellationToken"/> that can be used to signal the operation should be canceled.
+    /// </param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     private async Task RunCommandRevert(CommandRevert command, CancellationToken cancel)
     {
         if (command.TargetVersion == _currentRevision)

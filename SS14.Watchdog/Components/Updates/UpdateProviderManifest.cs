@@ -76,6 +76,22 @@ namespace SS14.Watchdog.Components.Updates
             return await DownloadAndInstallAsync(maxVersion, manifest.Builds[maxVersion], binPath, cancel);
         }
 
+        /// <summary>
+        /// Executes an update to the specified target version from the manifest.
+        /// </summary>
+        /// <param name="targetVersion">
+        /// The target version to update to. This must correspond to a valid version in the manifest.
+        /// </param>
+        /// <param name="binPath">
+        /// The path to the binary directory where the update files will be applied.
+        /// </param>
+        /// <param name="cancel">
+        /// An optional <see cref="CancellationToken"/> that can be used to signal the operation should be canceled.
+        /// </param>
+        /// <returns>
+        /// A string representing the updated revision if the update is successful; otherwise, null
+        /// if the update fails or the target version is not found in the manifest.
+        /// </returns>
         public async Task<string?> RunUpdateToVersionAsync(
             string targetVersion,
             string binPath,
@@ -91,6 +107,24 @@ namespace SS14.Watchdog.Components.Updates
             return await DownloadAndInstallAsync(targetVersion, versionInfo, binPath, cancel);
         }
 
+        /// <summary>
+        /// Resolves the target version to revert to based on the current version, an explicitly specified version,
+        /// and available versions in the manifest.
+        /// </summary>
+        /// <param name="currentVersion">
+        /// The current version of the application. This determines the starting point for identifying a prior version to revert to.
+        /// </param>
+        /// <param name="explicitVersion">
+        /// An explicitly specified version to revert to. If provided, this version will be validated against the manifest.
+        /// If it is valid, it will be returned; otherwise, null will be returned.
+        /// </param>
+        /// <param name="cancel">
+        /// An optional <see cref="CancellationToken"/> that can be used to signal the operation should be canceled.
+        /// </param>
+        /// <returns>
+        /// A string representing the resolved target version to revert to if successful; otherwise, null if no valid version
+        /// could be determined based on the provided criteria.
+        /// </returns>
         public async Task<string?> ResolveRevertTargetAsync(
             string? currentVersion,
             string? explicitVersion,
@@ -113,6 +147,19 @@ namespace SS14.Watchdog.Components.Updates
                 .FirstOrDefault();
         }
 
+        /// <summary>
+        /// Retrieves a list of the most recent update versions from the manifest.
+        /// </summary>
+        /// <param name="count">
+        /// The maximum number of recent versions to retrieve.
+        /// </param>
+        /// <param name="cancel">
+        /// An optional <see cref="CancellationToken"/> that can be used to signal the operation should be canceled.
+        /// </param>
+        /// <returns>
+        /// A read-only list of <see cref="UpdateVersionInfo"/> representing the most recent versions sorted by date,
+        /// or an empty list if the manifest cannot be fetched or contains no versions.
+        /// </returns>
         public async Task<IReadOnlyList<UpdateVersionInfo>> GetRecentVersionsAsync(
             int count,
             CancellationToken cancel = default)
@@ -128,6 +175,24 @@ namespace SS14.Watchdog.Components.Updates
                 .ToList();
         }
 
+        /// <summary>
+        /// Downloads the specified version of the server binary, verifies its integrity, and installs it to the target directory.
+        /// </summary>
+        /// <param name="version">
+        /// The version of the server to download and install.
+        /// </param>
+        /// <param name="versionInfo">
+        /// Metadata containing details about the server build for the specified version.
+        /// </param>
+        /// <param name="binPath">
+        /// The path to the binary directory where the downloaded and extracted files will be installed.
+        /// </param>
+        /// <param name="cancel">
+        /// An optional <see cref="CancellationToken"/> that can be used to signal the operation should be canceled.
+        /// </param>
+        /// <returns>
+        /// A string representing the installed version if the operation is successful; otherwise, null if the download or installation fails.
+        /// </returns>
         private async Task<string?> DownloadAndInstallAsync(
             string version,
             VersionInfo versionInfo,
