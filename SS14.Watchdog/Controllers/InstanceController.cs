@@ -102,6 +102,21 @@ namespace SS14.Watchdog.Controllers
             return Ok(new { version = resolved, immediate });
         }
 
+        /// <summary>
+        /// Retrieves a list of recent versions for a specified server instance, including their versions,
+        /// timestamps, and whether each version matches the currently running version.
+        /// </summary>
+        /// <param name="authorization">
+        /// The authorization header containing the credentials to authenticate the request.
+        /// </param>
+        /// <param name="key">
+        /// The unique identifier of the server instance whose version history is being queried.
+        /// </param>
+        /// <returns>
+        /// An <see cref="IActionResult"/> containing the list of recent versions if the operation succeeds.
+        /// Each version includes the version string, its timestamp, and an indicator if it is the currently running version.
+        /// Returns a 400 status code if the instance does not support version listing or if authentication fails.
+        /// </returns>
         [HttpGet("versions")]
         public async Task<IActionResult> Versions(
             [FromHeader(Name = "Authorization")] string authorization,
