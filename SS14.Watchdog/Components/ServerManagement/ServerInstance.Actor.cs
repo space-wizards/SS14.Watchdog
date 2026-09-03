@@ -516,6 +516,15 @@ public sealed partial class ServerInstance
         }
     }
 
+    /// <summary>
+    /// Initiates the server revert process to change the server's version to the specified target version.
+    /// The operation downloads and applies the appropriate version, updating the server state accordingly.
+    /// </summary>
+    /// <param name="targetVersion">The target server version to revert to.</param>
+    /// <param name="cancel">
+    /// A <see cref="CancellationToken"/> used to signal the operation should be canceled.
+    /// </param>
+    /// <returns>A task that represents the asynchronous revert operation.</returns>
     private async Task StartRunRevert(string targetVersion, CancellationToken cancel)
     {
         if (_updateProvider is not UpdateProviderManifest manifestProvider)
