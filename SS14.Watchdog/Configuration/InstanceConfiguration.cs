@@ -18,6 +18,12 @@ namespace SS14.Watchdog.Configuration
         public string? ApiToken { get; set; }
         public ushort ApiPort { get; set; }
 
+        /// <summary>
+        /// Whether this instance should be started automatically when the watchdog starts.
+        /// Set to false to prevent automatic startup.
+        /// </summary>
+        public bool AutoStart { get; set; } = true;
+
         public string RunCommand { get; set; } = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
             ? "bin/Robust.Server.exe"
             : "bin/Robust.Server";
