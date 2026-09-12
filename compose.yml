@@ -1,0 +1,32 @@
+x-watchdog-base: &watchdog-base
+  build:
+    context: .
+  environment:
+    - ASPNETCORE_URLS=${WATCHDOG_URL}
+  ports:
+    - ${WATCHDOG_PORT}:${WATCHDOG_PORT}
+    - ${SS14_PORT}:${SS14_PORT}/tcp
+    - ${SS14_PORT}:${SS14_PORT}/udp
+  restart: unless-stopped
+  volumes:
+    - ./instances:/watchdog/instances
+    - ./SS14.Watchdog/appsettings.yml:/watchdog/appsettings.yml
+
+services:
+  watchdog:
+    <<: *watchdog-base
+    container_name: ss14-watchdog
+    build:
+      context: .
+      target: runtime
+    profiles:
+      - prod
+
+  watchdog-dev:
+    <<: *watchdog-base
+    container_name: ss14-watchdog-dev
+    build:
+      context: .
+      target: dev
+    profiles:
+      - dev
